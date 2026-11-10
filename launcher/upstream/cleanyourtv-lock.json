@@ -1,0 +1,30 @@
+{
+  "repository": "Gathin23/cleanyourtv",
+  "release": "v3.4.0",
+  "commit": "fc148d5a9707b30e8f49f489625947421740dc55",
+  "reviewed_on": "2026-11-10",
+  "review_scope": "Directly adapted shared source components; not a wholesale import of the upstream launcher, themes, addons or cleanup rules",
+  "components": [
+    {
+      "name": "ServiceRepair",
+      "upstream_path": "launcher/app/src/main/java/com/gathin/tvhome/ServiceRepair.java",
+      "upstream_sha256": "092701b48294af6a0d257e78e072fbfb7caf29c1887b6fce1fe3c8e61b5a2a15",
+      "upstream_git_blob": "8ee8afd8468c7df1cfe4a62efa1c4f01ceeeaae2",
+      "local_path": "app/src/main/java/com/sweepmytv/launcher/ServiceRepair.java",
+      "local_sha256": "d51936525b95852542e0dddc6e205ab6e9db8807c8b6d259d245fa56851c2166",
+      "disposition": "Upstream file is byte-identical at v3.2.0 and v3.4.0. Existing Sweep TV adaptation retained."
+    }
+  ],
+  "policy": {
+    "check_latest_before_release": true,
+    "verify_commit_and_source_hashes": true,
+    "compatible_updates_authorized_after_verification": true,
+    "cleanup_permission_and_service_changes_require_user_approval": true,
+    "install_stock_upstream_launcher": false
+  },
+  "unapplied_scopes": [
+    "New or changed cleanup profiles and cleanup execution",
+    "Stock launcher themes, addons and unrelated interface changes",
+    "Remote-key behavior including the volume-hold issue paused by the user"
+  ]
+}

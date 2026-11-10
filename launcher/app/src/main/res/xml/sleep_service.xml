@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Standby for Turn off; typing a match into JioHotstar's search; keeping Talkies as the home screen while the
+     TV's own launcher stays enabled; the sleep warning; remote keys. It sees windows only of JioHotstar, the TV's
+     built-in launchers and Google's Assistant: the packages below are a starting point, replaced at start with the
+     launchers this TV actually has (SleepService.findStockHomes). -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/sleep_service_description"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagRequestFilterKeyEvents"
+    android:canRequestFilterKeyEvents="true"
+    android:canRetrieveWindowContent="true"
+    android:packageNames="in.startv.hotstar,com.google.android.apps.tv.launcherx,com.google.android.katniss"
+    android:notificationTimeout="100" />

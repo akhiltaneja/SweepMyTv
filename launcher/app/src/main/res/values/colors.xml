@@ -1,0 +1,6 @@
+<resources>
+    <color name="text_primary">#F5F5F7</color>
+    <color name="text_secondary">#99F5F5F7</color>
+    <color name="dock_band">#1A1A1D</color>
+    <color name="tile_placeholder">#232326</color>
+</resources>

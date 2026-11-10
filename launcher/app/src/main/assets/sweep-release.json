@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "product": "Sweep TV",
+  "version": "1.3.0-sweep.25",
+  "version_code": 71,
+  "date": "2026-11-11",
+  "distribution": "managed",
+  "notes": [
+    "Continue Watching prefers language-tagged landscape title covers instead of text-free catalog backdrops, while retaining explicit app-published promotional artwork.",
+    "Trending and New in India now load title-bearing landscape cover candidates on demand for the visible shelf. An intact portrait poster is used while loading or when a landscape cover is unavailable.",
+    "Cover files retain the original source bytes, with bounded caches and background loading. Updated artwork binds into the current card without rebuilding the shelf.",
+    "Current artwork selections take priority over older saved Apple TV resume artwork. Playback links, progress, content languages and YouTube preferences are preserved.",
+    "CleanYourTV shared source remains verified through v3.4.0; the existing ServiceRepair adaptation is retained."
+  ],
+  "verified_upstream": {
+    "repository": "Gathin23/cleanyourtv",
+    "release": "v3.4.0",
+    "commit": "fc148d5a9707b30e8f49f489625947421740dc55",
+    "reviewed_on": "2026-11-10",
+    "review_scope": "Directly adapted shared source components; not a wholesale import of the upstream launcher, themes, addons or cleanup rules"
+  },
+  "components": [
+    {
+      "name": "Talkies",
+      "detail": "Launcher core adapted from Raju / TechPP \u00b7 MIT"
+    },
+    {
+      "name": "tv-vibehack",
+      "detail": "Adapted Control Center source \u00b7 MIT"
+    },
+    {
+      "name": "Free My TV / Project Nayuki",
+      "detail": "Adapted spring, QR and phone setup source \u00b7 MIT"
+    },
+    {
+      "name": "Matinee",
+      "detail": "Adapted speed-test source and device-control approach \u00b7 MIT"
+    },
+    {
+      "name": "Luma",
+      "detail": "Adapted HDMI device source \u00b7 MIT"
+    },
+    {
+      "name": "GlassLauncher",
+      "detail": "Adapted app tile source \u00b7 MIT"
+    },
+    {
+      "name": "Twemoji",
+      "detail": "Avatar source b6b55fef1e86 \u00b7 CC BY 4.0"
+    },
+    {
+      "name": "DiceBear Thumbs",
+      "detail": "Bundled 10.x avatar illustrations \u00b7 CC0"
+    },
+    {
+      "name": "Outfit",
+      "detail": "Bundled typeface \u00b7 SIL OFL 1.1"
+    }
+  ]
+}

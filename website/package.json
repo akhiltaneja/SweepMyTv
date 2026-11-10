@@ -1,0 +1,11 @@
+{
+  "name": "sweep-tv-companion",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "prepare:site": "python3 prepare.py",
+    "dev": "node server.mjs",
+    "check": "node --check dist/app.js && node --check server.mjs"
+  }
+}

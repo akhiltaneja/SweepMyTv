@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Twemoji by Twitter/X and contributors, CC BY 4.0. Adapted with padding and background. See bundled notices. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="128dp" android:height="128dp" android:viewportWidth="36" android:viewportHeight="36">
+  <path android:fillColor="#DBDDF0" android:pathData="M18,0 A18,18 0,1 1,18,36 A18,18 0,1 1,18,0 Z" />
+  <group android:scaleX=".70" android:scaleY=".70" android:translateX="5.4" android:translateY="5.4">
+    <path android:fillColor="#E1E8ED" android:pathData="M36 11c0-1.104-.896-2-2-2s-2 .896-2 2c0 0-.011 3.285-3 3.894V12c0-6.075-4.925-11-11-11S7 5.925 7 12v3.237C1.778 16.806 0 23.231 0 27c0 1.104.896 2 2 2s2-.896 2-2c0 0 .002-3.54 3.336-3.958C7.838 27.883 8.954 33 11 33h1c4 0 3 2 7 2s3-2 6-2 2.395 2 6 2c1.657 0 3-1.343 3-3 0-.675-2.274-4.994-3.755-9.268C35.981 21.348 36 14.58 36 11z" />
+    <path android:fillColor="#292F33" android:pathData="M11.0,12.0 A2.0,2.0 0,1 0,15.0,12.0 A2.0,2.0 0,1 0,11.0,12.0 Z" />
+    <path android:fillColor="#292F33" android:pathData="M19.0,12.0 A4.0,4.0 0,1 0,27.0,12.0 A4.0,4.0 0,1 0,19.0,12.0 Z" />
+    <path android:fillColor="#9AAAB4" android:pathData="M21.0,13.0 A2.0,2.0 0,1 0,25.0,13.0 A2.0,2.0 0,1 0,21.0,13.0 Z" />
+    <path android:fillColor="#292F33" android:pathData="M22.192 19.491c2.65 1.987 3.591 5.211 2.1 7.199-1.491 1.988-4.849 1.988-7.5 0-2.65-1.987-3.591-5.211-2.1-7.199 1.492-1.989 4.849-1.988 7.5 0z" />
+  </group>
+</vector>

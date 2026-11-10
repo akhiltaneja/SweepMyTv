@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Which picture a pick card's image view currently holds (see HomeActivity.updatePickImages). -->
+    <item name="img_state" type="id" />
+</resources>

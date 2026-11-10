@@ -1,0 +1,25 @@
+# Private device state, build tools and release artifacts
+/research/
+/dist/
+/tools/
+/downloads/
+/upstream/
+/site-publication/
+/website/site-publication/
+/website/qa/
+**/node_modules/
+**/.gradle/
+**/build/
+**/__pycache__/
+**/.DS_Store
+**/local.properties
+**/release.properties
+**/.env
+**/.env.*
+*.keystore
+*.jks
+*.pem
+*.p12
+*.log
+# APKs are distributed as checksum-verified release/download assets, not Git blobs.
+*.apk
