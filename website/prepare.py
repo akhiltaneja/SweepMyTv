@@ -10,7 +10,7 @@ out = site / 'dist'
 for name in ['assets', 'downloads', 'notices']:
     (out / name).mkdir(parents=True, exist_ok=True)
 assets = {
-    'home.png': 'research/performance-2026-11-10/tv-continue-performance-70.png',
+    'home-grand-tour.png': 'research/continue-artwork-2026-11-10/grand-tour-final-65.png',
     'recommendations.png': 'research/portrait-continue-2026-11-10/tv-recommended-67.png',
     'formula-one.png': 'research/performance-2026-11-10/tv-f1-performance-70.png',
     'outfit.ttf': 'launcher/app/src/main/res/font/outfit.ttf',

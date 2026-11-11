@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const screens = {
-  home: {src:'assets/home.png', title:'Sweep TV home screen', alt:'Actual Sweep TV television showing Continue Watching, the app dock and compact header', note:'Actual test-TV screenshot · build 70 · Android TV 10'},
+  home: {src:'assets/home-grand-tour.png', title:'Sweep TV home screen', alt:'Sweep TV on the test television with The Grand Tour selected in a wide Continue Watching card', note:'Actual test-TV screenshot · build 65 · Android TV 10'},
   recommendations: {src:'assets/recommendations.png', title:'Recommended for you', alt:'Actual Sweep TV recommendations from Apple TV, Netflix and JioHotstar', note:'Actual test-TV screenshot · build 67 · portrait recommendations'},
   formula: {src:'assets/formula-one.png', title:'Formula 1 race center', alt:'Actual Sweep TV F1 cards with driver portraits, team logos, race countdown and published session results', note:'Actual test-TV screenshot · build 70 · F1 schedule and countdown'}
 };
