@@ -2,7 +2,17 @@
 
 A native Android TV launcher customized from [Talkies](https://github.com/rajupp/talkies), with local profiles, content discovery and a Formula 1 dashboard. Companion website source lives in `website/`.
 
-[Install](#install) · [First-time setup](#first-time-setup) · [What you get](#what-you-get) · [Updates](#updates) · [Troubleshooting](#troubleshooting) · [Credits](#credits-and-licenses)
+[Screenshots](#screenshots) · [Install](#install) · [First-time setup](#first-time-setup) · [What you get](#what-you-get) · [Updates](#updates) · [Troubleshooting](#troubleshooting) · [Credits](#credits-and-licenses)
+
+## Screenshots
+
+Captured on a Redmi TV running Android TV 10. Select any image to view it at full size.
+
+[![Sweep TV home screen with Continue Watching, The Grand Tour artwork and the app dock](website/dist/assets/home-grand-tour.png)](website/dist/assets/home-grand-tour.png)
+
+| Recommendations and new releases | Formula 1 race center |
+| --- | --- |
+| [![Portrait posters in the Recommended for you and New releases rows](website/dist/assets/recommendations.png)](website/dist/assets/recommendations.png) | [![Formula 1 widgets with the next race countdown, recent results and championship standings](website/dist/assets/formula-one.png)](website/dist/assets/formula-one.png) |
 
 ## Install
 
