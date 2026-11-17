@@ -1,17 +1,17 @@
 <div align="center">
-  <img src="docs/media/sweep.svg" alt="" width="68">
+  <img src="docs/media/sweep.svg" alt="" width="54">
   <h1>SweepMyTV</h1>
-  <p><strong>A customizable home screen for Android TV and Google TV.</strong></p>
-  <p>Keep your apps in reach, pick up what you were watching, and check the next race from Home.</p>
-  <p>
-    <a href="https://github.com/akhiltaneja/SweepMyTv/releases">Download preview</a> ·
-    <a href="#install">Install guide</a> ·
-    <a href="#feature-tour">Feature tour</a> ·
-    <a href="#tested-tvs">Tested TVs</a>
-  </p>
+  <p><strong>A fast, lightweight launcher for Android TV and Google TV.</strong></p>
+  <p>Customize your home screen, discover titles with the SweepMyTV recommendation engine, and follow Formula 1 and cricket from Home.</p>
+  <p><a href="#feature-tour">Feature tour</a> · <a href="#tested-tvs">Tested TVs</a> · <a href="https://github.com/akhiltaneja/SweepMyTv/releases">Releases</a></p>
 </div>
 
-[![SweepMyTV on a Redmi TV with Continue Watching, an expanded landscape card, and the app dock](docs/media/sweep-home.webp)](docs/media/sweep-home.webp)
+> **[Install SweepMyTV from your phone →](docs/INSTALL.md)**<br>
+> The guide also covers laptop setup and includes a copy-ready Claude Code prompt.
+
+<p align="center">
+  <a href="docs/media/sweep-home.webp"><img src="docs/media/sweep-home.webp" alt="SweepMyTV home with Continue Watching and the app dock" width="684"></a>
+</p>
 
 Screenshots show development builds running on a Redmi TV. Check the [release notes](https://github.com/akhiltaneja/SweepMyTv/releases) for features included in the downloadable build.
 
@@ -24,41 +24,9 @@ Screenshots show development builds running on a Redmi TV. Check the [release no
 
 ## Install
 
-Sweep TV targets **Android TV and Google TV devices running Android 8.0 or newer** that allow APK installation. The supported setup uses your existing TV and remote and requires no root.
+SweepMyTV runs on **Android TV and Google TV devices with Android 8.0 or newer** that allow APK installation. For phone, laptop, and assisted setup, see the [installation guide](docs/INSTALL.md). It also covers [first launch](docs/INSTALL.md#first-launch) and the optional Home and Continue Watching permissions.
 
-1. **Download.** Get `sweep-tv.apk` from the [signed preview release](https://github.com/akhiltaneja/SweepMyTv/releases/tag/v1.3.0-sweep.25). The release also includes SHA-256 checksums.
-2. **Send to the TV.** On an Android phone, use [Send Files to TV](https://play.google.com/store/apps/details?id=com.yablio.sendfilestotv) on the same Wi-Fi. A USB drive and a TV file manager also work.
-3. **Install and open.** Open the APK on the TV, allow the file app to install it if prompted, then open Sweep TV from Apps.
-
-<details>
-<summary>Install from a computer with ADB</summary>
-
-Install [Android Platform Tools](https://developer.android.com/tools/releases/platform-tools) and verify the preview APK against its release checksum. Enable debugging in your TV’s Developer options, find its IP address, and accept its debugging prompt. Use your TV’s address in the commands below.
-
-```sh
-adb connect 192.168.1.100:5555
-adb -s 192.168.1.100:5555 install -r sweep-tv.apk
-```
-
-If the TV shows a pairing code, follow [Android’s wireless debugging guide](https://developer.android.com/tools/adb#connect-to-a-device-over-wi-fi). Open Sweep TV from Apps after installation.
-
-</details>
-
-<details>
-<summary>Get help from a coding assistant</summary>
-
-Download the signed APK, enable TV debugging, and open the [setup prompt builder](https://sweep-tv.akhiltaneja04.chatgpt.site/#setup). The prompt includes the package and checksum and asks for your approval before extra grants or device-specific cleanup.
-
-</details>
-
-### First-time setup
-
-- **Home button.** Use your TV’s Home app picker if it has one. If the remote opens stock Home, check **Finish setup → Home button** for the optional Sweep TV helper.
-- **Continue Watching.** **Finish setup** links to Notification access and Read TV listings where your TV exposes them. Streaming apps decide what playback information they share.
-- **Catalog and location.** App-published suggestions can work without a TMDB key. Configure an optional key for catalog discovery where that option is available. Edit the city in **System → Weather location** if the automatic estimate is wrong.
-- **Advanced controls.** Some animation and accessibility repair features can use the optional `WRITE_SECURE_SETTINGS` grant.
-
-**Current download** · `1.3.0-sweep.25` (build 71) is a prerelease that passed local checks. On-device verification for that exact package is pending. The [Tested TVs](#tested-tvs) notes name the build that was checked on hardware.
+**Current download** · `1.3.0-sweep.25` (build 71) is a prerelease that passed local checks. On-device verification for that exact package is pending. The [Tested TVs](#tested-tvs) notes name the build checked on hardware.
 
 ## Feature tour
 
