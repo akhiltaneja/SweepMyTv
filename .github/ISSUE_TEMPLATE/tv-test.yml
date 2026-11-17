@@ -1,0 +1,64 @@
+name: Report a TV test
+description: Share what worked and what failed on your TV or streaming device.
+title: "[TV test] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Put the brand and exact model in the title. This issue can be public, so remove serial numbers, IP addresses, Wi-Fi names, account details, and keys from text and screenshots.
+  - type: input
+    id: model
+    attributes:
+      label: Brand and exact model
+      description: Look under Settings → About. Include the model code if the TV shows one.
+      placeholder: Redmi MiTV-MOOQ1
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: TV operating system and version
+      placeholder: Android TV 10, Google TV running Android 14, etc.
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware or build number
+      description: Copy the build number from About, or enter Unknown if you cannot find it.
+      placeholder: QTG3.200305.006.2591
+    validations:
+      required: true
+  - type: input
+    id: sweep-version
+    attributes:
+      label: SweepMyTV version
+      description: Check System → Updates in Sweep TV, or use the release tag for the APK you tried.
+      placeholder: 1.3.0-sweep.25
+    validations:
+      required: true
+  - type: checkboxes
+    id: working-checks
+    attributes:
+      label: What worked on your TV?
+      description: Check only the items you actually tried successfully.
+      options:
+        - label: Installed and opened Sweep TV
+        - label: Physical Home button returned to Sweep TV
+        - label: Physical Power button worked
+        - label: Sleep and wake worked
+        - label: Sweep TV worked after a full restart
+        - label: Opened a streaming app and played video
+        - label: Switched to an HDMI input
+  - type: textarea
+    id: notes
+    attributes:
+      label: What failed or needed extra steps?
+      description: Include errors, anything you skipped, and a screenshot if useful. Enter None if everything you tried worked.
+    validations:
+      required: true
+  - type: textarea
+    id: cleanup
+    attributes:
+      label: Optional cleanup results
+      description: If you tried cleanup, list what you changed, what worked after a restart, and anything you restored.
