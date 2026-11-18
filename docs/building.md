@@ -45,10 +45,12 @@ On Windows PowerShell, use `New-Item -ItemType Directory -Force tools/signing` a
 
 ```sh
 cd launcher
-./gradlew testDebugUnitTest assembleRelease lintRelease
+./gradlew assembleRelease
+./gradlew lintRelease
+./gradlew testDebugUnitTest
 ```
 
-On Windows, run `.\gradlew.bat testDebugUnitTest assembleRelease lintRelease` from `launcher`.
+On Windows, run the same tasks from `launcher` with `.\gradlew.bat` in place of `./gradlew`. To run one suite while developing, use a filter such as `./gradlew testDebugUnitTest --tests '*RecommendationsTest'`.
 
 The build writes these files under `launcher/`.
 
