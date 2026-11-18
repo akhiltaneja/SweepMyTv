@@ -3,7 +3,7 @@
   <h1>SweepMyTV</h1>
   <p><strong>A fast, lightweight launcher for Android TV and Google TV.</strong></p>
   <p>Customize your home screen, discover titles with the SweepMyTV recommendation engine, and follow Formula 1 and cricket from Home.</p>
-  <p><a href="#feature-tour">Feature tour</a> · <a href="#tested-tvs">Tested TVs</a> · <a href="docs/building.md">Build from source</a> · <a href="https://github.com/akhiltaneja/SweepMyTv/releases">Releases</a></p>
+  <p><a href="https://sweepmytv.com/">SweepMyTV.com</a> · <a href="#feature-tour">Feature tour</a> · <a href="#tested-tvs">Tested TVs</a> · <a href="docs/building.md">Build from source</a> · <a href="https://github.com/akhiltaneja/SweepMyTv/releases">Releases</a></p>
 </div>
 
 > **[Install SweepMyTV from your phone →](docs/INSTALL.md)**<br>
