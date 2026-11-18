@@ -2,7 +2,7 @@
   <img src="docs/media/sweep.svg" alt="" width="54">
   <h1>SweepMyTV</h1>
   <p><strong>A fast, lightweight launcher for Android TV and Google TV.</strong></p>
-  <p>Customize your home screen, discover titles with the SweepMyTV recommendation engine, and follow Formula 1 and cricket from Home.</p>
+  <p>Customize your home screen, discover titles with the Sweep Recommendation Engine, and follow Formula 1 and cricket from Home.</p>
   <p><a href="https://sweepmytv.com/">SweepMyTV.com</a> · <a href="#feature-tour">Feature tour</a> · <a href="#tested-tvs">Tested TVs</a> · <a href="docs/building.md">Build from source</a> · <a href="https://github.com/akhiltaneja/SweepMyTv/releases">Releases</a></p>
 </div>
 
@@ -44,7 +44,7 @@ Browse trending titles, recent releases, and shelves for supported apps. Use ori
 | --- | --- |
 | [![SweepMyTV recommendation and recent-release poster rows](docs/media/recommendations.webp)](docs/media/recommendations.webp) | [![Slow Horses details with poster, synopsis, cast, rating, and Apple TV action](docs/media/title-details.webp)](docs/media/title-details.webp) |
 
-The **SweepMyTV recommendation engine** is also in testing. The India beta checks artwork, streaming links, and availability before publishing picks. It skips rent-only offers and can be tested without entering a personal TMDB key. Availability in a given build is listed in its release notes.
+**Sweep Recommendation Engine v1 Beta** checks artwork, title links, and streaming availability before publishing picks. Prime Video picks exclude rent-only titles. You can try the engine without a personal TMDB key. Recommendation availability depends on your region, streaming apps, and build. See the [engine version history](https://sweepmytv.com/recommendation-engine.json).
 
 ### Formula 1 and cricket
 
