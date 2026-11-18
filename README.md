@@ -3,7 +3,7 @@
   <h1>SweepMyTV</h1>
   <p><strong>A fast, lightweight launcher for Android TV and Google TV.</strong></p>
   <p>Customize your home screen, discover titles with the SweepMyTV recommendation engine, and follow Formula 1 and cricket from Home.</p>
-  <p><a href="#feature-tour">Feature tour</a> · <a href="#tested-tvs">Tested TVs</a> · <a href="https://github.com/akhiltaneja/SweepMyTv/releases">Releases</a></p>
+  <p><a href="#feature-tour">Feature tour</a> · <a href="#tested-tvs">Tested TVs</a> · <a href="docs/building.md">Build from source</a> · <a href="https://github.com/akhiltaneja/SweepMyTv/releases">Releases</a></p>
 </div>
 
 > **[Install SweepMyTV from your phone →](docs/INSTALL.md)**<br>
@@ -104,14 +104,7 @@ Use [GitHub Releases](https://github.com/akhiltaneja/SweepMyTv/releases) for sig
 
 ## Build and check
 
-Use JDK 17, Android SDK platform 35, and build-tools 35.0.0. Run the launcher’s build helper from `launcher/`. Configure your own signing key for a signed package.
-
-```sh
-cd launcher
-./build-preview.sh
-```
-
-The helper checks the reviewed upstream versions, runs Android tests, builds the APK, and runs lint. [Upstream maintenance notes](launcher/UPSTREAM_UPDATES.md) describe the pinned shared components and release checks.
+The [build guide](docs/building.md) covers tool setup, Gradle commands, installing a local APK on a test TV, signing, and the maintainer release workflow.
 
 For the static [companion website](website/README.md), run `npm run check` and `npm run dev` from `website/`.
 
