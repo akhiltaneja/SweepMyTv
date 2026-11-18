@@ -55,26 +55,11 @@ Use [Claude Code](https://code.claude.com/docs/en/quickstart) or another coding 
 
 1. Download the APK and checksum to a folder on your laptop. Enable TV debugging using the steps [above](#install-from-a-laptop).
 2. Open Claude Code in that folder. On first launch, follow its sign-in instructions.
-3. Copy the prompt below. Replace the TV model and address, then paste it into the local Claude Code session. If your TV uses a pairing code, keep the dialog open until the assistant requests it.
-
-```text
-Help me install the official SweepMyTV preview on my own TV.
-
-TV brand and model: <your TV model>
-TV debugging address: <IP address and port shown on the TV>
-APK: sweep-tv.apk in this folder
-Checksum file: SHA256SUMS from the same SweepMyTV GitHub release
-Expected package: com.sweepmytv.launcher
-
-1. Confirm this device runs Android TV or Google TV on Android 8.0 or newer. Use the Android Platform Tools already on this computer. If they are missing, ask before installing them.
-2. Verify the APK's SHA-256 against the release checksum. Stop if the checksum is missing or differs.
-3. Connect only to the TV address I give you. If wireless pairing is required, ask me for its pairing address and code. Confirm the connected model before installing.
-4. Install the APK, preserving settings when updating a copy signed with the same certificate. If there is a signing conflict, explain it before removing anything. Keep the stock launcher and my streaming apps installed.
-5. Help me open Sweep TV and test the dock, physical Home button, and a streaming app. If the TV needs extra access for a feature, explain it and ask before changing any permission, Home setting, or remote mapping.
-6. Leave optional cleanup, firmware, and networking settings alone. Tell me what worked and disconnect from ADB when we're done unless I ask to keep it connected.
-```
+3. Copy the [SweepMyTV setup prompt](../prompt.md) into your assistant. If Wireless debugging asks for a pairing code, enter it locally at the terminal prompt.
 
 ## First launch
+
+Follow the [first-time setup guide](https://sweepmytv.com/tutorials/first-time-setup/) after installing.
 
 - **Open Sweep TV** from Apps. If your TV offers a **Home app** picker, use it to select Sweep TV. If the physical Home button still goes to stock Home, review **Finish setup → Home button** and enable the optional helper only if needed.
 - **Set up Continue Watching** by reviewing **Notification access** and **Read TV listings** in Finish setup if they are available on your TV. What appears depends on the apps that share playback information.
