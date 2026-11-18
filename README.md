@@ -110,4 +110,9 @@ For the static [companion website](website/README.md), run `npm run check` and `
 
 ## Credits and licenses
 
-Sweep TV is based on [Talkies](https://github.com/rajupp/talkies) and includes selected [CleanYourTV](https://github.com/Gathin23/cleanyourtv) components. The optional [Aerial Views](https://github.com/theothernt/AerialViews) screensaver is an independent project. See the [MIT license](LICENSE) and [third-party notices](launcher/THIRD_PARTY_NOTICES.md) for code, artwork, feeds, fonts, and their respective credits.
+- **[CleanYourTV](https://github.com/Gathin23/cleanyourtv)** contributed selected components, including accessibility service recovery. The Control Center includes code from the earlier [tv-vibehack branch](https://github.com/samdegan2311/tv-vibehack/tree/pr/control-center).
+- **[Talkies](https://github.com/rajupp/talkies)** contributed code retained in parts of the title row and media-session listener.
+- **[Free My TV](https://github.com/simbasjungles/free-my-tv)** and **[Project Nayuki](https://www.nayuki.io/page/qr-code-generator-library)** contributed focus motion, phone setup, and QR code generation. **[Matinee](https://github.com/Jarvis322/matinee)** contributed speed-test code, **[Luma](https://github.com/0xProbabillity/luma-tv)** helped identify HDMI devices, and **[GlassLauncher](https://github.com/tlfares/GlassLauncher)** contributed app tiles for apps without TV banners.
+- **[Aerial Views](https://github.com/theothernt/AerialViews)** is the independent project behind the optional screensaver.
+
+See the [MIT license](LICENSE) and [third-party notices](launcher/THIRD_PARTY_NOTICES.md) for copyright notices and credits for code, artwork, data feeds, and fonts.
