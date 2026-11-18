@@ -1,0 +1,10 @@
+{
+  "name": "SweepTV Recommendation Engine",
+  "releases": [
+    {
+      "version": "v1",
+      "stage": "Beta",
+      "notes": "SweepTV's own selection and ranking logic combines curated, popular and recently released titles with streaming-app and language preferences. The shared catalogue refreshes every six hours; recommendation ranking runs locally. Beta coverage starts with India and varies by build and provider."
+    }
+  ]
+}

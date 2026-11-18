@@ -1,108 +1,418 @@
 const $ = (selector) => document.querySelector(selector);
-const screens = {
-  home: {src:'assets/home-grand-tour.png', title:'Sweep TV home screen', alt:'Sweep TV on the test television with The Grand Tour selected in a wide Continue Watching card', note:'Actual test-TV screenshot · build 65 · Android TV 10'},
-  recommendations: {src:'assets/recommendations.png', title:'Recommended for you', alt:'Actual Sweep TV recommendations from Apple TV, Netflix and JioHotstar', note:'Actual test-TV screenshot · build 67 · portrait recommendations'},
-  formula: {src:'assets/formula-one.png', title:'Formula 1 race center', alt:'Actual Sweep TV F1 cards with driver portraits, team logos, race countdown and published session results', note:'Actual test-TV screenshot · build 70 · F1 schedule and countdown'}
-};
-let currentScreen = 'home';
-let release;
-let toastTimer;
-const tabs = [...document.querySelectorAll('[data-screen]')];
-function selectScreen(key) {
-  if (!screens[key]) return;
-  currentScreen = key;
-  const screen = screens[key];
-  $('#screen-image').src = screen.src; $('#screen-image').alt = screen.alt;
-  $('#screen-note').textContent = screen.note;
-  for (const tab of tabs) { const active = tab.dataset.screen === key; tab.setAttribute('aria-selected', String(active)); tab.tabIndex = active ? 0 : -1; }
-  $('#screen-panel').setAttribute('aria-labelledby', tabs.find(tab => tab.dataset.screen === key).id);
+
+const compareRange = $('#comparison-range');
+const comparison = $('#comparison-screen');
+
+function updateComparison() {
+  comparison.style.setProperty('--split', compareRange.value + '%');
+  compareRange.setAttribute('aria-valuetext', compareRange.value + '% of the original home screen');
 }
-for (const tab of tabs) {
-  tab.addEventListener('click', () => selectScreen(tab.dataset.screen));
-  tab.addEventListener('keydown', (event) => {
-    const index = tabs.indexOf(tab);
-    const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1;
-    if (next < 0) return; event.preventDefault(); selectScreen(tabs[next].dataset.screen); tabs[next].focus();
+compareRange.addEventListener('input', updateComparison);
+updateComparison();
+compareRange.hidden = false;
+
+function initWatchPreview() {
+  const demo = $('.watch-demo');
+  const providers = {
+    hotstar: 'JioHotstar',
+    'prime-video': 'Prime Video',
+    'apple-tv': 'Apple TV',
+    netflix: 'Netflix',
+    zee5: 'ZEE5',
+  };
+  const titles = [
+    ['modern-family', 'Modern Family', 'Series', 'hotstar', '8.5', 56],
+    ['grand-tour', 'The Grand Tour', 'Series', 'prime-video', '8.7', 68],
+    ['monarch', 'Monarch: Legacy of Monsters', 'Series', 'apple-tv', '7.0', 33],
+    ['lupin', 'Lupin', 'Series', 'netflix', '7.5', 76],
+    ['the-gorge', 'The Gorge', 'Film', 'apple-tv', '6.7', 47],
+    ['study-group', 'Study Group', 'Series', 'prime-video', '8.2', 29],
+    ['legend-of-hanuman', 'The Legend of Hanuman', 'Series', 'hotstar', '9.1', 64],
+    ['silo', 'Silo', 'Series', 'apple-tv', '8.1', 22],
+    ['gyaarah-gyaarah', 'Gyaarah Gyaarah', 'Series', 'zee5', '8.1', 41],
+    ['october', 'October', 'Film', 'hotstar', '7.6', 57],
+    ['stick', 'Stick', 'Series', 'apple-tv', '7.2', 36],
+    ['slow-horses', 'Slow Horses', 'Series', 'apple-tv', '8.4', 74],
+  ];
+  const track = demo.querySelector('.watch-track');
+  const title = demo.querySelector('[data-watch-title]');
+  const details = demo.querySelector('[data-watch-details]');
+  const status = demo.querySelector('[data-watch-status]');
+  const cards = [...titles, ...titles, ...titles].map(([key, , , provider, rating, progress]) => {
+    const card = document.createElement('div');
+    card.className = 'watch-card';
+    // These TV captures already contain the streaming app's icon.
+    if (key === 'modern-family') card.classList.add('has-provider-icon');
+    if (key === 'grand-tour') card.classList.add('has-portrait-provider-icon');
+    for (const view of ['portrait', 'landscape']) {
+      const image = document.createElement('img');
+      image.className = 'watch-art watch-' + view;
+      image.alt = '';
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      image.src = 'assets/watch-preview/' + key + '-' + view + '.webp';
+      card.append(image);
+    }
+    const bar = document.createElement('span');
+    bar.className = 'watch-progress';
+    bar.style.setProperty('--watch-progress', progress + '%');
+    const score = document.createElement('span');
+    score.className = 'watch-rating';
+    score.textContent = rating;
+    const badge = document.createElement('img');
+    badge.className = 'watch-provider-icon';
+    badge.alt = '';
+    badge.loading = 'lazy';
+    badge.decoding = 'async';
+    badge.src = 'assets/watch-preview/providers/' + provider + '.webp';
+    card.append(bar, score, badge);
+    return card;
   });
+  track.replaceChildren(...cards);
+
+  let index = titles.length;
+  let canAnimate = false;
+  let timer;
+  let touchStart;
+  function select(next, manual = false) {
+    cards[index].classList.remove('is-current');
+    index = next;
+    cards[index].classList.add('is-current');
+    track.style.setProperty('--watch-index', index);
+    const position = index % titles.length;
+    const [, name, type, provider, rating] = titles[position];
+    title.textContent = name;
+    details.textContent = type + ' · ' + providers[provider] + ' · IMDb ' + rating;
+    if (manual) {
+      status.textContent = [name, details.textContent, (position + 1) + ' of ' + titles.length].join(', ');
+    }
+  }
+  function advance(direction, manual = false) {
+    if (index < titles.length || index >= titles.length * 2) {
+      // Reposition to the identical card in the middle copy before sliding again.
+      track.classList.add('is-repositioning');
+      select(titles.length + index % titles.length);
+      track.getBoundingClientRect();
+      track.classList.remove('is-repositioning');
+    }
+    select(index + direction, manual);
+    if (manual) {
+      clearTimeout(timer);
+      timer = undefined;
+      sync();
+    }
+  }
+  function sync(animate = canAnimate) {
+    canAnimate = animate;
+    if (canAnimate && !demo.querySelector(':focus-visible')) {
+      if (timer === undefined) timer = setTimeout(() => {
+        timer = undefined;
+        advance(1);
+        sync();
+      }, 2400);
+    } else {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+  }
+
+  demo.querySelector('[data-watch-previous]').addEventListener('click', () => advance(-1, true));
+  demo.querySelector('[data-watch-next]').addEventListener('click', () => advance(1, true));
+  demo.addEventListener('keydown', event => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    advance(event.key === 'ArrowRight' ? 1 : -1, true);
+  });
+  const viewport = demo.querySelector('.watch-window');
+  viewport.addEventListener('touchstart', event => { touchStart = event.touches[0]; }, {passive: true});
+  viewport.addEventListener('touchend', event => {
+    if (!touchStart) return;
+    const dx = event.changedTouches[0].clientX - touchStart.clientX;
+    const dy = event.changedTouches[0].clientY - touchStart.clientY;
+    touchStart = undefined;
+    if (Math.abs(dx) > 35 && Math.abs(dx) > Math.abs(dy)) advance(dx < 0 ? 1 : -1, true);
+  }, {passive: true});
+  viewport.addEventListener('touchcancel', () => { touchStart = undefined; });
+  for (const event of ['focusin', 'focusout']) {
+    demo.addEventListener(event, () => queueMicrotask(() => sync()));
+  }
+  select(index);
+  demo.hidden = false;
+  $('#watch-still').hidden = true;
+  demo.closest('figure').querySelector('figcaption').textContent = 'Interactive preview · Sample titles and progress';
+  return {demo, sync};
 }
-for (const button of document.querySelectorAll('[data-select-screen]')) button.addEventListener('click', () => {
-  selectScreen(button.dataset.selectScreen); $('#preview').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+
+function initAerialPreview(motionPreference) {
+  const scenes = [
+    ["fjords", "Norwegian fjords", "https://www.pexels.com/video/epic-aerial-view-of-norwegian-fjords-and-cliffs-39925485/"],
+    ["big-sur", "Big Sur coastline", "https://www.pexels.com/video/aerial-view-of-california-s-scenic-big-sur-coastline-30167141/"],
+    ["autumn", "Autumn forest", "https://www.pexels.com/video/aerial-view-of-dense-forest-in-autumn-35893827/"],
+    ["palawan", "Palawan lagoons", "https://www.pexels.com/video/stunning-aerial-view-of-lagoons-in-palawan-35218347/"],
+    ["cappadocia", "Balloons over the mountains", "https://www.pexels.com/video/drone-footage-of-hot-air-balloons-flying-over-the-mountains-8207252/"],
+    ["sunset", "Mountain sunset", "https://www.pexels.com/video/drone-shot-of-the-mountain-peak-during-sunset-4288053/"],
+    ["new-york", "New York skyline", "https://www.pexels.com/video/drone-video-of-new-york-city-skyline-12122310/"],
+    ["iceland", "Icelandic waterfall", "https://www.pexels.com/video/stunning-drone-view-of-waterfall-in-iceland-34476954/"],
+    ["reef", "Coral reef", "https://www.pexels.com/video/school-of-fish-in-the-deep-blue-sea-5358755/"],
+    ["forest-falls", "Forest waterfall", "https://www.pexels.com/video/aerial-view-of-waterfall-in-rainy-forest-5061380/"],
+    ["desert", "Peruvian sand dunes", "https://www.pexels.com/video/aerial-view-of-sand-dunes-in-peruvian-desert-28916863/"],
+    ["alps", "Snowy Alps", "https://www.pexels.com/video/breathtaking-aerial-drone-view-of-snowy-alps-35000595/"],
+  ];
+  const player = $('.aerial-player');
+  const [first, second] = player.querySelectorAll('video');
+  const controls = player.querySelector('.aerial-controls');
+  const playButton = player.querySelector('[data-aerial-play]');
+  const label = player.querySelector('[data-aerial-scene]');
+  const credit = player.closest('figure').querySelector('[data-aerial-credit]');
+  const failed = new Set();
+  let active = first;
+  let spare = second;
+  let current;
+  let prepared;
+  let deck = [];
+  let switching = false;
+  let visible = false;
+  let automatic = false;
+  let manual = false;
+  let blocked = false;
+
+  const mayPlay = () => visible && (manual || automatic) && !blocked;
+
+  function prepare() {
+    if (prepared) return prepared;
+    if (!deck.length) {
+      deck = scenes.filter(scene => !failed.has(scene));
+      for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+      }
+      if (deck.length > 1 && deck.at(-1) === current) {
+        [deck[0], deck[deck.length - 1]] = [deck.at(-1), deck[0]];
+      }
+    }
+    prepared = deck.pop();
+    if (prepared) {
+      spare.muted = true;
+      spare.preload = 'auto';
+      spare.src = 'assets/aerial-preview/' + prepared[0] + '.mp4';
+    }
+    return prepared;
+  }
+
+  function showPlayButton() {
+    blocked = true;
+    manual = false;
+    playButton.hidden = !visible;
+  }
+
+  async function nextScene() {
+    if (switching || !mayPlay()) return;
+    switching = true;
+    try {
+      while (mayPlay()) {
+        const scene = prepare();
+        if (!scene) {
+          showPlayButton();
+          return;
+        }
+        const incoming = spare;
+        const deadline = setTimeout(() => incoming.pause(), 8000);
+        try {
+          await incoming.play();
+        } catch (error) {
+          if (!mayPlay()) return;
+          if (error.name === 'NotAllowedError') {
+            showPlayButton();
+            return;
+          }
+          failed.add(scene);
+          prepared = undefined;
+          continue;
+        } finally {
+          clearTimeout(deadline);
+        }
+        if (!mayPlay()) {
+          incoming.pause();
+          return;
+        }
+
+        const outgoing = active;
+        [active, spare] = [incoming, outgoing];
+        current = scene;
+        prepared = undefined;
+        label.textContent = scene[1];
+        credit.href = scene[2];
+        credit.setAttribute('aria-label', scene[1] + ' footage on Pexels');
+        controls.hidden = false;
+        // Only the incoming layer fades. The outgoing frame stays opaque underneath.
+        incoming.classList.add('is-incoming', 'is-visible');
+        if (!motionPreference.matches) await new Promise(resolve => setTimeout(resolve, 550));
+        outgoing.pause();
+        outgoing.classList.remove('is-visible');
+        incoming.classList.remove('is-incoming');
+        if (mayPlay()) prepare();
+        return;
+      }
+    } finally {
+      switching = false;
+    }
+  }
+
+  function sync(inView, canAnimate) {
+    visible = inView;
+    automatic = canAnimate && !navigator.connection?.saveData;
+    playButton.hidden = !visible || mayPlay();
+    if (!mayPlay()) {
+      first.pause();
+      second.pause();
+      return;
+    }
+    if (switching) return;
+    if (!current || active.ended) {
+      nextScene();
+    } else if (active.paused) {
+      active.play().catch(() => { if (mayPlay()) showPlayButton(); });
+    }
+  }
+
+  for (const video of [first, second]) {
+    video.addEventListener('timeupdate', () => {
+      if (video === active && video.duration - video.currentTime < .85) nextScene();
+    });
+    video.addEventListener('ended', () => { if (video === active) nextScene(); });
+  }
+  player.querySelector('[data-aerial-next]').addEventListener('click', nextScene);
+  playButton.addEventListener('click', () => {
+    if (failed.size) {
+      failed.clear();
+      deck = [];
+    }
+    blocked = false;
+    manual = true;
+    sync(visible, automatic);
+  });
+  return {player, sync};
+}
+
+const watchPreview = initWatchPreview();
+const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
+const aerialPreview = initAerialPreview(motionPreference);
+const heroActions = $('.hero-actions');
+const heroCtas = Array.from(heroActions.querySelectorAll('[data-hero-cta]'), (link, position) => {
+  const label = link.querySelector('.hero-cta-text');
+  const phrases = [label, ...link.querySelectorAll('.hero-cta-option')].map(span => span.textContent);
+  label.parentElement.dataset.initialLabel = phrases[0];
+  return { link, label, phrases, index: 0, length: phrases[0].length, deleting: true,
+    firstPause: 2800 + position * 1700, timer: undefined };
 });
-$('#expand-preview').addEventListener('click', () => {
-  const screen = screens[currentScreen]; $('#dialog-image').src = screen.src; $('#dialog-image').alt = screen.alt;
-  $('#preview-dialog-title').textContent = screen.title; $('#dialog-note').textContent = screen.note; $('#preview-dialog').showModal();
+const widgetShowcase = $('.widget-showcase');
+const catalogMedia = $('.catalog-media');
+const loopImages = new Map(Array.from(document.querySelectorAll('[data-loop]'), image => [
+  image, { still: image.getAttribute('src'), visible: false },
+]));
+let heroActionsVisible = false;
+let widgetVisible = false;
+let catalogVisible = false;
+let watchVisible = false;
+let aerialVisible = false;
+
+function typeHeroLabel(cta) {
+  const phrase = cta.phrases[cta.index];
+  cta.length += cta.deleting ? -1 : 1;
+  cta.label.textContent = phrase.slice(0, cta.length);
+  cta.link.classList.add('is-typing');
+  let delay = cta.deleting ? 32 : 55;
+  if (cta.length === 0) {
+    cta.index = (cta.index + 1) % cta.phrases.length;
+    cta.link.setAttribute('aria-label', cta.phrases[cta.index]);
+    cta.deleting = false;
+    delay = 145;
+  } else if (cta.length === phrase.length) {
+    cta.link.classList.remove('is-typing');
+    cta.deleting = true;
+    delay = 4200;
+  }
+  cta.timer = setTimeout(() => typeHeroLabel(cta), delay);
+}
+
+function syncHeroActions() {
+  const animate = !motionPreference.matches && !document.hidden && heroActionsVisible;
+  for (const cta of heroCtas) {
+    if (animate && !cta.link.matches(':hover, :focus')) {
+      if (cta.timer === undefined) cta.timer = setTimeout(() => typeHeroLabel(cta), cta.firstPause);
+      continue;
+    }
+    clearTimeout(cta.timer);
+    cta.timer = undefined;
+    if (motionPreference.matches) cta.index = 0;
+    const phrase = cta.phrases[cta.index];
+    cta.label.textContent = phrase;
+    cta.link.setAttribute('aria-label', phrase);
+    cta.link.classList.remove('is-typing');
+    cta.length = phrase.length;
+    cta.deleting = true;
+  }
+}
+
+function syncMotion() {
+  const canAnimate = !motionPreference.matches && !document.hidden;
+  for (const [image, state] of loopImages) {
+    const src = canAnimate && state.visible ? image.dataset.loop : state.still;
+    if (image.getAttribute('src') !== src) image.src = src;
+  }
+  widgetShowcase.classList.toggle('is-moving', canAnimate && widgetVisible);
+  catalogMedia.classList.toggle('is-moving', canAnimate && catalogVisible);
+  watchPreview.sync(canAnimate && watchVisible);
+  aerialPreview.sync(!document.hidden && aerialVisible, canAnimate);
+  syncHeroActions();
+}
+for (const {link} of heroCtas) {
+  for (const event of ['mouseenter', 'mouseleave', 'focus', 'blur']) link.addEventListener(event, syncHeroActions);
+}
+motionPreference.addEventListener('change', syncMotion);
+document.addEventListener('visibilitychange', syncMotion);
+const observer = new IntersectionObserver(entries => {
+  for (const {target, isIntersecting} of entries) {
+    if (target === heroActions) heroActionsVisible = isIntersecting;
+    else if (target === widgetShowcase) widgetVisible = isIntersecting;
+    else if (target === catalogMedia) catalogVisible = isIntersecting;
+    else if (target === watchPreview.demo) watchVisible = isIntersecting;
+    else if (target === aerialPreview.player) aerialVisible = isIntersecting;
+    else loopImages.get(target).visible = isIntersecting;
+  }
+  syncMotion();
+}, {threshold: 0.15});
+for (const image of loopImages.keys()) observer.observe(image);
+observer.observe(heroActions);
+observer.observe(widgetShowcase);
+observer.observe(catalogMedia);
+observer.observe(watchPreview.demo);
+observer.observe(aerialPreview.player);
+syncMotion();
+
+const engineVersion = $('[data-engine-version]');
+fetch('recommendation-engine.json').then(response => {
+  if (!response.ok) throw new Error('Engine versions unavailable');
+  return response.json();
+}).then(({releases}) => {
+  const current = releases?.[0];
+  if (current && /^v\d+(?:\.\d+){0,2}$/.test(current.version) && ['Beta', 'Stable'].includes(current.stage)) {
+    engineVersion.textContent = current.stage === 'Stable' ? current.version.toUpperCase() : `${current.stage} ${current.version.toUpperCase()}`;
+  }
+}).catch(() => { /* The homepage includes the current version for offline and no-script use. */ });
+
+for (const button of document.querySelectorAll('[data-enlarge]')) button.addEventListener('click', () => {
+  const screenshot = button.querySelector('img');
+  $('#dialog-image').src = screenshot.currentSrc || screenshot.src;
+  $('#dialog-image').alt = screenshot.alt;
+  $('#preview-dialog-title').textContent = button.dataset.title;
+  $('#dialog-note').textContent = button.dataset.note || 'Captured on our Redmi TV';
+  button.focus({preventScroll: true});
+  $('#preview-dialog').showModal();
 });
-$('#open-recovery').addEventListener('click', () => $('#recovery-dialog').showModal());
+
 for (const button of document.querySelectorAll('[data-close-dialog]')) button.addEventListener('click', () => button.closest('dialog').close());
 for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('click', (event) => {
   if (event.target !== dialog) return; const r = dialog.getBoundingClientRect();
   if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) dialog.close();
 });
-function checkModel(value) {
-  if (/mooq1/i.test(value)) return {kind:'reference', title:'This is our reference model.', body:'The launcher, recommendations and F1 widget were verified on the MiTV-MOOQ1 running Android TV 10. Your device still needs its own setup and remote/playback checks.'};
-  if (/samsung|tizen|\blg\b|webos|roku|vidaa|fire\s?tv|fire\s?os/i.test(value)) return {kind:'other', title:'This needs a different setup path.', body:'This preview targets Android TV / Google TV. It does not claim support for Tizen, webOS, Roku, VIDAA, or Fire TV. Check the operating system of the device you want to customize.'};
-  if (/android|google\s?tv|xiaomi|redmi|mi\s?tv|sony|bravia|tcl|hisense|philips|oneplus|realme|shield|nvidia/i.test(value)) return {kind:'candidate', title:'A good candidate—check the operating system.', body:'If this device runs Android TV 8.0+ or Google TV and permits APK installation, it may support the preview. Brand alone cannot confirm compatibility. The setup prompt asks your assistant to verify the device first.'};
-  return {kind:'unknown', title:'Let’s identify the TV first.', body:'Check Settings → About for Android TV / Google TV and the Android version. You can still create a setup prompt below; it tells your assistant to verify the operating system before making changes.'};
-}
-$('#compatibility-form').addEventListener('submit', (event) => {
-  event.preventDefault(); const model = $('#tv-model').value.trim(); if (!model) return;
-  const result = checkModel(model); const target = $('#compatibility-result');
-  target.replaceChildren(); const strong = document.createElement('strong'); strong.textContent = result.title;
-  const text = document.createElement('p'); text.textContent = result.body; target.append(strong, text); target.dataset.kind = result.kind; target.hidden = false;
-  $('#setup-model').value = model;
-});
-function address(value) {
-  const match = /^(\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?$/.exec(value.trim());
-  if (!match || match[1].split('.').some(part => Number(part) > 255 || String(Number(part)) !== part)) return null;
-  const port = match[2] ? Number(match[2]) : 5555; if (port < 1 || port > 65535) return null;
-  return `${match[1]}:${port}`;
-}
-function buildPrompt(model, host, scope) {
-  const apkName = release.file.split('/').pop();
-  return `Help me set up Sweep TV on my own Android TV. Work step by step and verify the actual device.
-
-TV model (user-provided, verify it): ${JSON.stringify(model)}
-ADB address: ${host}
-Downloaded APK: ${apkName}
-Expected package: com.sweepmytv.launcher
-Preview version: ${release.version}
-Expected SHA-256: ${release.sha256}
-
-1. Confirm this is Android TV / Google TV, Android 8.0 or newer, and supports sideloading. If it is not, stop and explain. Connect only to the TV address above; ask me to accept its debugging prompt. Do not scan other devices.
-2. Find the APK I downloaded from the Sweep TV website. If it is missing, ask me to download it. Verify its checksum before installing. Back up the existing app/disabled-package list, current Home app, and relevant settings first. Do not print or collect API keys.
-3. Install Sweep TV as an update if its package is already present, preserving app data. Keep my other launchers and streaming apps installed. Do not uninstall Talkies or anything else without asking.
-4. Help me make the Home button work while keeping the stock launcher enabled. Test the normal Home preference first. Explain and ask before granting WRITE_SECURE_SETTINGS or Accessibility access. Do not change DNS, network, firmware, or unrelated settings.
-5. Show me the home screen and verify recommendations and the F1 widget. Add my own TMDB key only through the TV's Keys and location flow; never ask me to paste it into chat. F1's schedule/results widget needs no API key.
-${scope === 'review' ? '6. Review optional cleanup using CleanYourTV’s guarded tools and a device-specific profile. Produce a concrete package list with reasons and a recovery file, then ask me before disabling anything. Never apply a generic debloat list. Preserve streaming, Google services, voice, casting, updates, inputs, Bluetooth, remote and keyboard.' : '6. Launcher setup only. Do not disable or remove any TV packages.'}
-7. Ask me to test the real remote, video playback, inputs and casting. Keep a recovery path. Ask whether I want debugging left enabled for this session before closing it.
-
-This is a personal prototype. This candidate passed local checks but is not yet physically verified on the reference TV. Earlier builds were checked on one MiTV-MOOQ1 running Android TV 10. Test this exact build on this TV; do not infer verification from earlier versions.`;
-}
-$('#setup-form').addEventListener('submit', (event) => {
-  event.preventDefault(); const model = $('#setup-model').value.replace(/\s+/g,' ').trim(); const host = address($('#setup-ip').value);
-  const error = $('#setup-error'); error.hidden = true;
-  if (!model || !host || !release) {
-    error.textContent = !model ? 'Enter your TV brand and model.' : !host ? 'Enter a valid TV IP address, like 192.168.1.100. Add :port only if your TV shows a different debugging port.' : 'Preview details have not loaded. Reload this page before creating a setup prompt.';
-    error.hidden = false; (!model ? $('#setup-model') : $('#setup-ip')).focus(); return;
-  }
-  const scope = new FormData(event.currentTarget).get('scope');
-  $('#setup-prompt').textContent = buildPrompt(model, host, scope); $('#setup-form').hidden = true; $('#prompt-result').hidden = false;
-  $('#copy-status').textContent = ''; $('#copy-prompt').focus();
-});
-$('#edit-setup').addEventListener('click', () => { $('#prompt-result').hidden = true; $('#setup-form').hidden = false; $('#setup-model').focus(); });
-function toast(message) { clearTimeout(toastTimer); $('#toast').textContent = message; $('#toast').hidden = false; toastTimer = setTimeout(() => { $('#toast').hidden = true; }, 3500); }
-async function copyText(value, status) {
-  try { await navigator.clipboard.writeText(value); if (status) status.textContent = 'Copied. Paste it into your coding assistant.'; toast('Copied to clipboard'); }
-  catch { if (status) status.textContent = 'Clipboard access is unavailable. Select the prompt above and copy it manually.'; toast('Please select and copy the text manually.'); }
-}
-$('#copy-prompt').addEventListener('click', () => copyText($('#setup-prompt').textContent, $('#copy-status')));
-$('#copy-checksum').addEventListener('click', () => { if (release) copyText(release.sha256); });
-fetch('release.json').then(response => { if (!response.ok) throw new Error('Release unavailable'); return response.json(); }).then(data => {
-  if (!/^downloads\/sweep-tv-[\w.-]+\.apk$/.test(data.file) || !/^[a-f0-9]{64}$/.test(data.sha256)) throw new Error('Invalid release');
-  release = data; $('#release-version').textContent = data.version;
-  $('#release-size').textContent = data.bytes >= 1_000_000 ? `${(data.bytes / 1_000_000).toFixed(1)} MB` : `${Math.round(data.bytes / 1000)} KB`;
-  $('#release-checks').textContent = `${data.tests} Android + ${data.gateTests} release checks`;
-  $('#download-apk').href = data.file; $('#download-apk').download = data.file.split('/').pop(); $('#download-apk').removeAttribute('aria-disabled');
-  $('#release-checksum').textContent = data.sha256;
-  $('#release-stage').textContent = data.deviceVerified ? 'This build was checked on the reference TV; other devices require their own checks.' : `Build ${data.code}: title-cover artwork update. Local checks passed; installation and physical-TV verification are pending. Screenshots show earlier TV-tested builds. Last installed: ${data.previousTVVersion}.`;
-}).catch(() => { $('#release-version').textContent = 'Release details unavailable'; $('#release-stage').textContent = 'Reload this page to restore the verified download link.'; });

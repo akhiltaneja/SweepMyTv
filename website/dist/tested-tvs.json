@@ -1,0 +1,16 @@
+[
+  {
+    "brand": "Redmi",
+    "model": "MiTV-MOOQ1",
+    "aliases": ["Redmi 55-inch", "Xiaomi Redmi", "tarzan"],
+    "os": "Android TV 10",
+    "firmware": null,
+    "sweepVersion": "1.3.0-sweep.132",
+    "tested": "2026-11-17",
+    "status": "verified",
+    "launcher": "Sweep TV opened and responded to navigation. The dock, Formula 1 and cricket sections were observed on the TV. One Apple TV title link opened the expected title.",
+    "limitations": "Fresh installation, the physical Home and Power buttons, and sleep and wake were outside this verification. The firmware build was not recorded in this test report.",
+    "cleanup": "A separate October 2026 test on this Redmi covered selected Xiaomi content and analytics packages on firmware QTG3.200305.006.2591.",
+    "cleanupReference": "https://github.com/Gathin23/cleanyourtv/tree/main/examples/xiaomi-mi-tv-4a"
+  }
+]

@@ -1,0 +1,88 @@
+.engine-page{background:radial-gradient(ellipse 90% 560px at 50% 0%,var(--raised),transparent),var(--page)}
+.engine-hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:clamp(30px,5vw,70px);align-items:center;padding-block:clamp(50px,7vw,100px) 52px}
+.engine-hero .eyebrow{font-size:.875rem;margin-bottom:20px;letter-spacing:.09em}
+.engine-hero h1{font-size:clamp(3rem,5.7vw,5.3rem);line-height:1;max-width:13ch;text-wrap:balance}
+.engine-hero h1 em{font-style:normal;color:var(--link)}
+.engine-page-name{font-size:1.125rem;color:var(--link);font-weight:600;margin-top:23px}
+.engine-deck{font-size:1.125rem;color:var(--muted);max-width:51ch;margin-top:12px}
+.engine-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}
+.engine-availability{font-size:.875rem;color:var(--hint);margin-top:16px}
+.engine-hero-visual{background:linear-gradient(140deg,var(--raised),var(--panel));border:1px solid var(--line-strong);border-radius:18px;overflow:hidden;padding:24px 0 0}
+.engine-hero-visual img{width:100%;height:auto;min-height:180px;object-fit:cover;object-position:left}
+.engine-hero-visual figcaption{padding:11px 20px}
+.engine-visual-caption{display:grid;gap:6px;padding:24px 20px 30px;border-top:1px solid var(--line);margin-top:8px}
+.engine-visual-caption strong{font-size:1.6rem;line-height:1.15;letter-spacing:-.03em}
+.engine-visual-caption span{color:var(--muted)}
+.engine-jump{display:flex;gap:10px 24px;flex-wrap:wrap;border-block:1px solid var(--line);padding-block:15px;font-size:.9375rem}
+.engine-jump a{display:inline-flex;align-items:center;min-height:30px;text-decoration:none}
+.engine-jump a:hover{text-decoration:underline}
+.engine-chapter{padding-block:clamp(55px,7vw,92px)}
+.engine-chapter-heading{max-width:740px;margin-bottom:30px}
+.engine-chapter-heading .eyebrow{font-size:.875rem;letter-spacing:.1em;margin-bottom:15px}
+.engine-chapter-heading h2{font-size:clamp(2.25rem,4.5vw,3.8rem);text-wrap:balance}
+.engine-chapter-heading>p:last-child{font-size:1.125rem;color:var(--muted);margin-top:18px;max-width:65ch}
+.engine-flow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel)}
+.engine-flow li{padding:26px}
+.engine-flow li+li{border-left:1px solid var(--line)}
+.engine-step-label{font-size:.875rem;color:var(--link);margin-bottom:21px}
+.engine-flow h3{font-size:1.4rem;line-height:1.2;margin-bottom:12px}
+.engine-flow li>p:last-child{color:var(--muted);font-size:1rem}
+.engine-inline-note{display:flex;align-items:baseline;gap:10px 20px;flex-wrap:wrap;margin-top:22px}
+.engine-inline-note p{color:var(--muted)}
+.engine-demo-section,.engine-shelves-section{padding-block:clamp(55px,7vw,92px);background:var(--section);border-block:1px solid var(--line)}
+.engine-demo{padding:clamp(19px,3vw,34px);background:var(--page);border:1px solid var(--line-strong);border-radius:16px}
+.engine-demo-heading{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.engine-demo-heading h3{font-size:1.45rem}
+.engine-demo-heading>span{font-size:.875rem;color:var(--hint)}
+.engine-demo-note,.engine-demo-footnote{font-size:.9375rem;color:var(--hint);margin-top:13px;max-width:90ch}
+.engine-filter-controls{display:flex;align-items:flex-end;gap:15px;flex-wrap:wrap;margin-top:25px}
+.engine-filter-field{flex:1 1 180px;display:grid;gap:8px;font-size:.9375rem;color:var(--text)}
+.engine-select{position:relative;display:block}
+.engine-select::after{content:"";position:absolute;right:17px;top:17px;width:8px;height:8px;border-right:2px solid var(--link);border-bottom:2px solid var(--link);transform:rotate(45deg);pointer-events:none}
+.engine-select select{appearance:none;width:100%;min-height:47px;background:var(--panel);border:1px solid var(--line-strong);border-radius:9px;padding:10px 40px 10px 13px;font:inherit;color:var(--text)}
+.engine-select select:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.engine-filter-controls :disabled{opacity:.6;cursor:default}
+.engine-sample-status{font-size:1rem;color:var(--link);margin-block:22px 15px;min-height:1.6em}
+.engine-sample-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:18px;list-style:none;margin:0;padding:0}
+.engine-sample-grid li{min-width:0}
+.engine-sample-grid img{width:100%;aspect-ratio:2/3;height:auto;object-fit:cover;background:var(--raised);border:1px solid var(--line);border-radius:9px}
+.engine-sample-grid h4{font-size:1rem;line-height:1.3;margin:10px 0 5px;font-weight:550}
+.engine-sample-grid p{font-size:.875rem;color:var(--hint);margin:0}
+.engine-demo-footnote{margin-top:23px}
+.engine-language-note,.engine-rating-note{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:20px 40px;margin-top:32px}
+.engine-language-note h3,.engine-rating-note h3{font-size:1.45rem;line-height:1.2}
+.engine-language-note p,.engine-rating-note p{color:var(--muted);max-width:70ch}
+.engine-table-scroll{overflow-x:auto;border-block:1px solid var(--line)}
+.engine-ranking-table{width:100%;border-collapse:collapse;text-align:left;font-size:1rem}
+.engine-ranking-table caption{text-align:left;color:var(--hint);font-size:.875rem;padding-block:15px}
+.engine-ranking-table th,.engine-ranking-table td{padding:19px 20px 19px 0;vertical-align:top;border-top:1px solid var(--line)}
+.engine-ranking-table thead th{color:var(--link);font-size:.9375rem}
+.engine-ranking-table tbody th{width:28%;min-width:130px;font-weight:550}
+.engine-ranking-table td{color:var(--muted)}
+.engine-shelf-list>div{display:grid;grid-template-columns:minmax(0,.65fr) minmax(0,1.35fr);gap:20px 50px;padding-block:25px;border-top:1px solid var(--line)}
+.engine-shelf-list dt{font-size:1.4rem;font-weight:550;line-height:1.2;letter-spacing:-.025em}
+.engine-shelf-list dd,.engine-shelf-note{color:var(--muted)}
+.engine-shelf-note{margin-top:18px;font-size:.9375rem;max-width:85ch}
+.engine-principles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px}
+.engine-principles h3{font-size:1.45rem;line-height:1.2;padding-top:18px;border-top:1px solid var(--line)}
+.engine-principles p{color:var(--muted);margin-top:15px}
+.engine-privacy-scope{color:var(--hint);font-size:.9375rem;margin-top:28px;max-width:85ch}
+.engine-beta-section{padding-block:clamp(45px,6vw,80px);background:var(--section);border-block:1px solid var(--line)}
+.engine-beta-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:35px 70px}
+.engine-beta-layout .eyebrow{font-size:.875rem;margin-bottom:19px}
+.engine-beta-layout .eyebrow span{display:inline-block;text-transform:none;letter-spacing:0;border:1px solid var(--line-strong);border-radius:5px;padding:3px 8px;margin-left:6px}
+.engine-beta-layout h2{font-size:clamp(2.3rem,4.7vw,4rem)}
+.engine-beta-layout p{margin-top:19px;color:var(--muted);max-width:58ch}
+.engine-beta-layout .button{margin-top:24px}
+.engine-beta-copy h3{font-size:1.5rem}
+.engine-beta-copy ul{padding-left:20px;margin:20px 0;color:var(--muted)}
+.engine-beta-copy li+li{margin-top:12px}
+.engine-faq details{border-top:1px solid var(--line);padding-block:19px}
+.engine-faq summary{font-size:1.125rem;font-weight:550;cursor:pointer;padding-right:16px}
+.engine-faq details p{max-width:82ch;color:var(--muted);margin-top:14px}
+.engine-endnote{margin-top:50px;padding-top:35px;border-top:1px solid var(--line)}
+.engine-endnote h3{font-size:clamp(1.9rem,3vw,2.8rem)}
+.engine-endnote p{color:var(--muted);margin-top:14px}
+@media(max-width:1000px){.engine-hero{grid-template-columns:minmax(0,1fr)}.engine-hero h1{max-width:18ch}.engine-hero-visual{max-width:760px}.engine-sample-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.engine-flow,.engine-principles,.engine-beta-layout{grid-template-columns:1fr}.engine-flow li+li{border-left:0;border-top:1px solid var(--line)}.engine-flow li{padding:23px}.engine-step-label{margin-bottom:12px}.engine-language-note,.engine-rating-note,.engine-shelf-list>div{grid-template-columns:1fr;gap:12px}.engine-sample-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 14px}.engine-filter-controls .button{width:100%}.engine-ranking-table tbody th{width:34%;min-width:95px}.engine-ranking-table th,.engine-ranking-table td{padding-right:12px}.engine-hero h1{font-size:clamp(2.65rem,10vw,4rem)}.engine-hero-visual img{min-height:130px}.engine-deck{font-size:1.0625rem}.engine-chapter-heading h2{font-size:2.35rem}.engine-page .footer-base{align-items:start}.engine-privacy-scope{margin-top:23px}}
+@media(prefers-reduced-motion:reduce){.engine-page{scroll-behavior:auto}}

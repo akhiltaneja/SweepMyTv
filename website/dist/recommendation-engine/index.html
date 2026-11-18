@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Meet SweepTV Recommendation Engine Beta V1. Explore how our India catalogue, app and language filters, local ranking and six-hour refreshes bring picks to your TV.">
+  <meta name="theme-color" content="#101010">
+  <title>SweepTV Recommendation Engine · Beta V1 | SweepMyTV</title>
+  <link rel="canonical" href="https://sweepmytv.com/recommendation-engine/">
+  <meta property="og:title" content="SweepTV Recommendation Engine · Beta V1">
+  <meta property="og:description" content="Your apps. Your languages. A closer look at the recommendation engine built by SweepTV.">
+  <meta property="og:url" content="https://sweepmytv.com/recommendation-engine/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="SweepMyTV">
+  <meta property="og:image" content="https://sweepmytv.com/assets/home-current.webp">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="../assets/sweep.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="engine.css">
+  <link rel="preload" href="../assets/outfit.ttf" as="font" type="font/ttf" crossorigin>
+  <script src="engine.js" defer></script>
+</head>
+<body class="engine-page">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="../" aria-label="SweepMyTV home"><img src="../assets/sweep.svg" width="32" height="32" alt=""><span>Sweep<span class="brand-tv">MyTV</span></span></a>
+    <nav aria-label="Main navigation">
+      <a href="../#setup">Install</a><a href="./" aria-current="page">Engine</a><a href="../#sports">Sports</a><a href="../tutorials/">Tutorials</a><a href="../tvs/">Tested TVs</a>
+    </nav>
+    <a class="button outline github-profile" href="https://github.com/akhiltaneja/SweepMyTv" target="_blank" rel="noopener noreferrer" aria-label="SweepMyTV on GitHub (opens in a new tab)"><img class="github-avatar" src="../assets/github-avatar.webp" width="26" height="26" alt=""><span>Akhil Taneja</span><img class="github-mark" src="../assets/github-mark.svg" width="16" height="16" alt=""></a>
+  </header>
+  <main id="main" tabindex="-1">
+    <section class="engine-hero wrap" aria-labelledby="engine-title">
+      <div class="engine-hero-copy">
+        <p class="eyebrow catalog-version">Built by SweepTV <span data-engine-version>Beta V1</span></p>
+        <h1 id="engine-title">SweepTV Recommendation <em>Engine.</em></h1>
+        <p class="engine-page-name">Your apps. Your languages. Better things to watch.</p>
+        <p class="engine-deck">Our own recommendation layer brings curated picks, popular titles and recent releases into one home screen, shaped around your streaming apps and preferred languages.</p>
+        <div class="engine-actions"><a class="button primary" href="#try-filters">Try the filters</a><a class="button outline" href="../#setup">Set up SweepMyTV</a></div>
+        <p class="engine-availability">Beta V1 · India catalogue · Availability varies by build and provider</p>
+      </div>
+      <figure class="engine-hero-visual"><img src="../assets/discovery.webp" width="1440" height="484" alt="Our Recommendations shelf on a Redmi TV, with title posters and streaming-app badges"><figcaption>Our Recommendations, captured on the Redmi test TV.</figcaption><div class="engine-visual-caption"><strong>Selected for your Home.</strong><span>Curated titles meet local preferences.</span></div></figure>
+    </section>
+    <nav class="engine-jump wrap" aria-label="On this page"><a href="#how-it-works">How it works</a><a href="#try-filters">Explore filters</a><a href="#ranking">How we rank</a><a href="#shelves">Your shelves</a><a href="#privacy">Privacy &amp; caching</a><a href="#beta">Beta V1</a></nav>
+
+    <section id="how-it-works" class="engine-chapter wrap" aria-labelledby="flow-title">
+      <div class="engine-chapter-heading"><p class="eyebrow">The recommendation journey</p><h2 id="flow-title">A shared catalogue.<br>A local choice.</h2><p>SweepTV supplies the selection, ranking, filtering and delivery logic. Title metadata, artwork, ratings and provider availability come from third-party sources.</p></div>
+      <ol class="engine-flow" role="list">
+        <li><p class="engine-step-label">In the catalogue</p><h3>Find and check titles</h3><p>Curated entries, popular titles and recent releases are checked for the region, provider link, artwork and supporting metadata before publication.</p></li>
+        <li><p class="engine-step-label">On your TV</p><h3>Apply your choices</h3><p>The launcher narrows the pool to supported apps installed on your TV and the original languages you select, then ranks eligible titles locally.</p></li>
+        <li><p class="engine-step-label">On your Home screen</p><h3>Build useful shelves</h3><p>Picks appear in discovery and app-specific rows. Saved data remains available between refreshes, while new catalogue entries and artwork arrive.</p></li>
+      </ol>
+      <div class="engine-inline-note"><strong>Keyless recommendations in development builds</strong><p>The hosted catalogue refreshes independently of your TV. The downloadable preview uses a TMDB key for discovery.</p></div>
+    </section>
+
+    <section id="try-filters" class="engine-demo-section" aria-labelledby="demo-title">
+      <div class="wrap">
+        <div class="engine-chapter-heading"><p class="eyebrow">Explore the filters</p><h2 id="demo-title">Just Netflix.<br>Just English.</h2><p>That is a valid setup. When Netflix and English are your choices, eligible recommendations stay within those choices.</p></div>
+        <div class="engine-demo">
+          <div class="engine-demo-heading"><h3>Try a sample catalogue</h3><span>India · snapshot from 19 November 2026</span></div>
+          <p class="engine-demo-note">This small sample demonstrates provider and original-language filtering. It does not run the full TV ranking or check your subscription.</p>
+          <form class="engine-filter-controls" aria-label="Sample recommendation filters">
+            <div class="engine-filter-field"><label for="sample-provider">Streaming app</label><span class="engine-select"><select id="sample-provider" disabled><option value="netflix" selected>Netflix</option><option value="all">All sample apps</option><option value="apple-tv-plus">Apple TV</option><option value="prime">Prime Video</option><option value="jiohotstar">JioHotstar</option><option value="zee5">ZEE5</option></select></span></div>
+            <div class="engine-filter-field"><label for="sample-language">Original language</label><span class="engine-select"><select id="sample-language" disabled><option value="en" selected>English</option><option value="all">All sample languages</option><option value="hi">Hindi</option><option value="ko">Korean</option><option value="ta">Tamil</option></select></span></div>
+            <button class="button outline" type="button" id="reset-sample" disabled>Reset filters</button>
+          </form>
+          <p id="sample-status" class="engine-sample-status" role="status" aria-live="polite">Choose an app and language to explore the sample.</p>
+          <ul class="engine-sample-grid" id="sample-titles" role="list"></ul>
+          <noscript><p>Enable JavaScript to try these sample filters. The rest of this page is available without it.</p></noscript>
+          <p class="engine-demo-footnote">The sample is a small saved selection, not the full current catalogue. Service availability and ratings can change.</p>
+        </div>
+        <div class="engine-language-note"><h3>Language means the original language.</h3><p>An English filter uses the title’s original-language metadata. It does not promise that English dubbing or subtitles are available. Strict language choices can also reduce the number of eligible picks.</p></div>
+      </div>
+    </section>
+
+    <section id="ranking" class="engine-chapter wrap" aria-labelledby="ranking-title">
+      <div class="engine-chapter-heading"><p class="eyebrow">The selection logic</p><h2 id="ranking-title">More than a popularity list.</h2><p>Beta V1 uses explicit selection rules. Editorial picks can stay near the front, while the remaining slots rotate from the eligible catalogue.</p></div>
+      <div class="engine-table-scroll"><table class="engine-ranking-table"><caption>Signals used by the current local ranking rules</caption><thead><tr><th scope="col">Signal</th><th scope="col">How it helps</th></tr></thead><tbody>
+        <tr><th scope="row">Editorial selection</th><td>Curated catalogue entries can be retained ahead of the rotating pool.</td></tr>
+        <tr><th scope="row">Popularity and trending</th><td>Catalogue order and available weekly-trending markers help bring timely picks forward.</td></tr>
+        <tr><th scope="row">Release recency</th><td>Recent release-date metadata can improve a title’s position. Recency has less influence as that date gets older.</td></tr>
+        <tr><th scope="row">Local recent activity</th><td>Where supported apps share activity with SweepTV, recent provider and available genre signals can influence the rotating pool. Already-seen titles can be excluded from that pool.</td></tr>
+        <tr><th scope="row">Variety and identity</th><td>Duplicate titles are removed, and provider-balancing rules help spread eligible picks across the available services.</td></tr>
+      </tbody></table></div>
+      <div class="engine-rating-note"><h3>Ratings add context.</h3><p>IMDb scores appear where available. They help you assess a title; a score alone does not determine your recommendation shelf. Missing history or genre metadata means those local ranking signals may not be available.</p></div>
+    </section>
+
+    <section id="shelves" class="engine-shelves-section" aria-labelledby="shelves-title"><div class="wrap">
+      <div class="engine-chapter-heading"><p class="eyebrow">Different shelves, different jobs</p><h2 id="shelves-title">A useful place for each pick.</h2></div>
+      <dl class="engine-shelf-list">
+        <div><dt>Our Recommendations</dt><dd>A mix of retained editorial picks and locally ranked, rotating titles. The row aims for up to 12 eligible picks.</dd></div>
+        <div><dt>Trending</dt><dd>Popular discovery titles from the available catalogue, narrowed to the supported apps and languages relevant to your setup.</dd></div>
+        <div><dt>Recently released</dt><dd>A shelf that favours recent release-date metadata. A title’s original release date and its arrival on an OTT service can differ, so this is not a guarantee of its platform premiere date.</dd></div>
+        <div><dt>App recommendations</dt><dd>Up to 12 unique eligible titles for a supported app. A shorter row can draw from other saved, verified picks for that same app where the build supports fallback sources. Language choices still apply.</dd></div>
+      </dl>
+      <p class="engine-shelf-note">Continue Watching is separate: it uses resume entries and activity shared by supported apps. It is not a list generated from the discovery catalogue.</p>
+    </div></section>
+
+    <section id="privacy" class="engine-chapter wrap" aria-labelledby="privacy-title">
+      <div class="engine-chapter-heading"><p class="eyebrow">Refresh, reuse, respect your data</p><h2 id="privacy-title">Fresh picks.<br>A familiar starting point.</h2></div>
+      <div class="engine-principles">
+        <article><h3>Six-hour refreshes</h3><p>The shared catalogue is scheduled to refresh every six hours. Your TV checks for updates and rotates eligible recommendations in six-hour windows. Retained editorial picks and a small filtered pool can keep some titles on screen across windows.</p></article>
+        <article><h3>Saved data first</h3><p>The launcher reuses downloaded catalogue data and artwork. In current test builds, display-sized thumbnails are cached and visible cards get priority, so lower rows can load as you scroll.</p></article>
+        <article><h3>Local ranking</h3><p>Ranking runs on your TV. The request for the shared regional catalogue sends no viewing-history or profile payload. Local activity can influence choices without being included in that catalogue request.</p></article>
+      </div>
+      <p class="engine-privacy-scope">These statements describe SweepTV’s catalogue and ranking flow. Streaming apps and optional third-party metadata services have their own data practices.</p>
+    </section>
+
+    <section id="beta" class="engine-beta-section" aria-labelledby="beta-title"><div class="wrap engine-beta-layout">
+      <div><p class="eyebrow">Where we are today <span data-engine-version>Beta V1</span></p><h2 id="beta-title">India first.<br>Still getting better.</h2><p>Beta V1 is being tested with the India catalogue. The recommendation engine has its own version, separate from the launcher APK version.</p><a class="button outline" href="../recommendation-engine.json">View engine version history</a></div>
+      <div class="engine-beta-copy"><h3>What to expect</h3><ul><li>Provider and language coverage varies with the catalogue and your build.</li><li>A narrow filter can produce fewer than 12 eligible titles.</li><li>Availability checks can become outdated as streaming catalogues change.</li><li>Installing a streaming app does not confirm your subscription or playback entitlement.</li><li>Catalogue coverage, metadata quality, rotation and startup performance are being refined.</li></ul><p>Our own recommendation logic sits alongside third-party title data and the open-source components credited by SweepMyTV.</p></div>
+    </div></section>
+
+    <section class="engine-chapter wrap engine-faq" aria-labelledby="engine-faq-title"><div class="engine-chapter-heading"><h2 id="engine-faq-title">A few practical questions.</h2></div>
+      <details><summary>Do I need a TMDB API key?</summary><p>The hosted catalogue works without a personal key in builds that support it. The downloadable preview uses a TMDB key for discovery.</p></details>
+      <details><summary>What if I use only one streaming app?</summary><p>The installed-app filter keeps normal discovery recommendations within the supported apps on your TV. With only Netflix and English selected, eligible discovery picks stay within Netflix and English. A small matching catalogue can produce a shorter row.</p></details>
+      <details><summary>What happens when the catalogue service is unavailable?</summary><p>Previously downloaded picks and artwork can still be shown. Fallback sources depend on your build and saved data. Playback and fresh provider availability still depend on the streaming service and your connection.</p></details>
+      <details><summary>Why might I see the same title again?</summary><p>Editorial picks can remain across refreshes, and the eligible pool can be small after filtering. A six-hour rotation does not promise that every slot changes or that every suggestion is new to you.</p></details>
+      <details><summary>Does a title card guarantee I can watch it?</summary><p>A title link opens the relevant provider where supported. Your plan, region, account and the provider’s current catalogue determine playback. Prime Video catalogue checks aim to exclude rent-only picks.</p></details>
+      <div class="engine-endnote"><h3>Make your TV feel like yours.</h3><p>Explore the launcher, choose your apps and languages, and help shape the next version.</p><div class="engine-actions"><a class="button primary" href="../#setup">Set up SweepMyTV</a><a class="button outline" href="https://github.com/akhiltaneja/SweepMyTv/issues">Share feedback</a></div></div>
+    </section>
+  </main>
+  <footer class="site-footer"><div class="footer-inner wrap"><div class="footer-main"><div class="footer-brand"><a class="brand" href="../"><img src="../assets/sweep.svg" width="38" height="38" alt=""><span>Sweep<span class="brand-tv">MyTV</span></span></a><p>A customizable launcher for Android TV and Google TV.</p></div><nav class="footer-group" aria-label="Explore SweepMyTV"><h2>Explore</h2><ul><li><a href="../">Home</a></li><li><a href="../tutorials/">Tutorials</a></li><li><a href="../tvs/">Tested TVs</a></li></ul></nav><nav class="footer-group" aria-label="Project and credits"><h2>Project</h2><ul><li><a href="https://github.com/akhiltaneja/SweepMyTv">GitHub</a></li><li><a href="../notices/THIRD-PARTY-NOTICES.txt">Credits and third-party notices</a></li><li><a href="../notices/LICENSE.txt">MIT license</a></li></ul></nav></div><div class="footer-base"><p>Selection and ranking by SweepTV. Title metadata, ratings and artwork from third-party sources.</p><a href="#main">Back to top</a></div></div></footer>
+</body>
+</html>

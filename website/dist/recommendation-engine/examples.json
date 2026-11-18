@@ -1,0 +1,250 @@
+{
+  "region": "IN",
+  "snapshot_date": "2026-11-19",
+  "description": "Small sample from the public SweepTV catalogue; demonstrates filtering only.",
+  "titles": [
+    {
+      "title": "Paralyzed by Hope: The Maria Bamford Story",
+      "provider": "netflix",
+      "language": "en",
+      "year": "2026",
+      "rating": 7.7,
+      "poster": "https://image.tmdb.org/t/p/w780/waH2eiMaEW987JUTWyrj4x4d63k.jpg",
+      "link": "https://www.netflix.com/in/title/82917947"
+    },
+    {
+      "title": "LEGO Friends: Heartlake the Musical",
+      "provider": "netflix",
+      "language": "en",
+      "year": "2026",
+      "rating": 6.9,
+      "poster": "https://image.tmdb.org/t/p/w780/6PMMEU8eHSN0TlPG6koC8EEvavx.jpg",
+      "link": "https://www.netflix.com/in/title/83183454"
+    },
+    {
+      "title": "Unforgettable",
+      "provider": "netflix",
+      "language": "en",
+      "year": "2011",
+      "rating": 6.8,
+      "poster": "https://image.tmdb.org/t/p/w780/AvbMRqe3wSe4DBzIYl56CBlcalw.jpg",
+      "link": "https://www.netflix.com/in/title/70196154"
+    },
+    {
+      "title": "East of Eden",
+      "provider": "netflix",
+      "language": "en",
+      "year": "2026",
+      "rating": 8.1,
+      "poster": "https://image.tmdb.org/t/p/w780/axdUor6gLMTrrB1UF4Qfy0TTSyX.jpg",
+      "link": "https://www.netflix.com/in/title/81611854"
+    },
+    {
+      "title": "Below",
+      "provider": "netflix",
+      "language": "en",
+      "year": "2026",
+      "rating": 6.6,
+      "poster": "https://image.tmdb.org/t/p/w780/vgLqqhMUbljp585qPp1EFCyJtcz.jpg",
+      "link": "https://www.netflix.com/in/title/81652677"
+    },
+    {
+      "title": "The Mentalist",
+      "provider": "netflix",
+      "language": "en",
+      "year": "2008",
+      "rating": 8.2,
+      "poster": "https://image.tmdb.org/t/p/w780/k0kMdO52LpC5JWgd0uWEH7gqcCe.jpg",
+      "link": "https://www.netflix.com/in/title/70155590"
+    },
+    {
+      "title": "Meethe Mein Kya Hai",
+      "provider": "netflix",
+      "language": "hi",
+      "year": "2026",
+      "rating": 6.9,
+      "poster": "https://image.tmdb.org/t/p/w780/xTJYIPjyuCbkc7zEtfAFJfVDSV5.jpg",
+      "link": "https://www.netflix.com/in/title/83127937"
+    },
+    {
+      "title": "Dhindora",
+      "provider": "netflix",
+      "language": "hi",
+      "year": "2021",
+      "rating": 8.8,
+      "poster": "https://image.tmdb.org/t/p/w780/cVaqEhiRPtnWzZVNZu9iaJHsoVE.jpg",
+      "link": "https://www.netflix.com/in/title/82643833"
+    },
+    {
+      "title": "Dead-End Job",
+      "provider": "netflix",
+      "language": "ko",
+      "year": "2026",
+      "rating": 7.0,
+      "poster": "https://image.tmdb.org/t/p/w780/wUvzMC7EToPgci31ZZRCeqCmQ6d.jpg",
+      "link": "https://www.netflix.com/in/title/81997887"
+    },
+    {
+      "title": "Must Date the Playboy!",
+      "provider": "netflix",
+      "language": "ta",
+      "year": "2026",
+      "rating": 8.5,
+      "poster": "https://image.tmdb.org/t/p/w780/mxF3z6KmdDGf2jpHR2x0iqhkZyE.jpg",
+      "link": "https://www.netflix.com/in/title/83292938"
+    },
+    {
+      "title": "The Morning Show",
+      "provider": "apple-tv-plus",
+      "language": "en",
+      "year": "2019",
+      "rating": 8.1,
+      "poster": "https://image.tmdb.org/t/p/w780/y9x2R87yt2U616736NJrP0d56dt.jpg",
+      "link": "https://tv.apple.com/in/show/the-morning-show/umc.cmc.25tn3v8ku4b39tr6ccgb8nl6m"
+    },
+    {
+      "title": "Mayday",
+      "provider": "apple-tv-plus",
+      "language": "en",
+      "year": "2026",
+      "rating": 6.8,
+      "poster": "https://image.tmdb.org/t/p/w780/hVXjX1jLZ1ljFSNGXpjJfbTUOa7.jpg",
+      "link": "https://tv.apple.com/in/movie/mayday/umc.cmc.shin43vzfoz3h4ggx41z8rf"
+    },
+    {
+      "title": "The Dynasty: UConn Huskies",
+      "provider": "apple-tv-plus",
+      "language": "en",
+      "year": "2026",
+      "rating": 8.3,
+      "poster": "https://image.tmdb.org/t/p/w780/5lZ0NLV93fIx8yIWT38h8rt5u2I.jpg",
+      "link": "https://tv.apple.com/in/show/the-dynasty-uconn-huskies/umc.cmc.38cvggceyd4sn4sfgl3kus89b"
+    },
+    {
+      "title": "Knife Edge: Chasing Michelin Stars",
+      "provider": "apple-tv-plus",
+      "language": "en",
+      "year": "2025",
+      "rating": 7.5,
+      "poster": "https://image.tmdb.org/t/p/w780/yDIyXR3fbtX9QbW95PvuNmQwKG8.jpg",
+      "link": "https://tv.apple.com/in/show/knife-edge-chasing-michelin-stars/umc.cmc.2yhce9h11ctctdi23b29k1ek3"
+    },
+    {
+      "title": "Dr. Brain",
+      "provider": "apple-tv-plus",
+      "language": "ko",
+      "year": "2021",
+      "rating": 6.7,
+      "poster": "https://image.tmdb.org/t/p/w780/3bYYLQAFWHsTtJyZb0vIReJJv07.jpg",
+      "link": "https://tv.apple.com/in/show/dr-brain/umc.cmc.60vbrno9xpmmax8wmdo4ow05u"
+    },
+    {
+      "title": "Titans: The Rise of Wall Street",
+      "provider": "prime",
+      "language": "en",
+      "year": "2022",
+      "rating": 7.4,
+      "poster": "https://image.tmdb.org/t/p/w780/cGlABFfOIHpG8WzHOMziQ6lgu1c.jpg",
+      "link": "https://www.primevideo.com/detail/0T4ZJS1ONRMXJE00P5E58S5194"
+    },
+    {
+      "title": "Study Group",
+      "provider": "prime",
+      "language": "ko",
+      "year": "2025",
+      "rating": 8.2,
+      "poster": "https://image.tmdb.org/t/p/w780/nZDeIfKCzp0qhu4N3HxrcKWN59J.jpg",
+      "link": "https://www.primevideo.com/detail/0TN3LLJKUUNG5AK9EPZLK8D6W2"
+    },
+    {
+      "title": "A Korean Odyssey",
+      "provider": "prime",
+      "language": "ko",
+      "year": "2017",
+      "rating": 7.9,
+      "poster": "https://image.tmdb.org/t/p/w780/uJfF9m2bDXZf6Lng8kkyd0o0Qjz.jpg",
+      "link": "https://www.primevideo.com/detail/0HFIWQSJSKRZQVFOMGZQJPF00E"
+    },
+    {
+      "title": "All Pass",
+      "provider": "prime",
+      "language": "ta",
+      "year": "2026",
+      "rating": 8.7,
+      "poster": "https://image.tmdb.org/t/p/w780/sQiLftJQCZPjZuzpn8Xzb5I6tlW.jpg",
+      "link": "https://www.primevideo.com/detail/0GSB9FH1ZFS3CDRK6SUQFPW5SB"
+    },
+    {
+      "title": "Minions & Monsters",
+      "provider": "jiohotstar",
+      "language": "en",
+      "year": "2026",
+      "rating": 6.3,
+      "poster": "https://image.tmdb.org/t/p/w780/4LwvU9SZc8QQzW1X1FAPhNbXnEU.jpg",
+      "link": "https://www.hotstar.com/in/movies/minions-and-monsters/1271717769"
+    },
+    {
+      "title": "VisionQuest",
+      "provider": "jiohotstar",
+      "language": "en",
+      "year": "2026",
+      "rating": 7.8,
+      "poster": "https://image.tmdb.org/t/p/w780/WGyAyBPncfuu8MZhLY9RtfZPM0.jpg",
+      "link": "https://www.hotstar.com/in/shows/visionquest/1271652472"
+    },
+    {
+      "title": "Jeena Dil Se",
+      "provider": "jiohotstar",
+      "language": "hi",
+      "year": "2026",
+      "rating": 6.3,
+      "poster": "https://image.tmdb.org/t/p/w780/pEsKzjFxuwvw67mBEfvQaH7yKP4.jpg",
+      "link": "https://www.hotstar.com/in/movies/jeena-dil-se/1271717088"
+    },
+    {
+      "title": "Aryabhatt Ka Zero",
+      "provider": "jiohotstar",
+      "language": "hi",
+      "year": "2026",
+      "rating": 6.1,
+      "poster": "https://image.tmdb.org/t/p/w780/hI5MZ78pj2aFuyEz1oOFMVsr8dM.jpg",
+      "link": "https://www.hotstar.com/in/movies/aryabhatt-ka-zero/1271716493"
+    },
+    {
+      "title": "The Court",
+      "provider": "jiohotstar",
+      "language": "ta",
+      "year": "2026",
+      "rating": 7.6,
+      "poster": "https://image.tmdb.org/t/p/w780/iXUtd6fpt15vMZSO6du1uXQjcmv.jpg",
+      "link": "https://www.hotstar.com/in/shows/the-court/1271672560"
+    },
+    {
+      "title": "Last Man in Tower",
+      "provider": "zee5",
+      "language": "hi",
+      "year": "2026",
+      "rating": 7.5,
+      "poster": "https://image.tmdb.org/t/p/w780/8PHu0eeZABZCT0HrX79UoDAHivi.jpg",
+      "link": "https://www.zee5.com/movies/details/last-man-in-tower/0-0-1z51102286"
+    },
+    {
+      "title": "Sumo Didi",
+      "provider": "zee5",
+      "language": "hi",
+      "year": "2023",
+      "rating": 7.4,
+      "poster": "https://image.tmdb.org/t/p/w780/qrDFJdUBAqdiwcd0e0ajGpWtUPo.jpg",
+      "link": "https://www.zee5.com/movies/details/sumo-didi/0-0-1z51089186"
+    },
+    {
+      "title": "The Invite",
+      "provider": "zee5",
+      "language": "en",
+      "year": "2026",
+      "rating": 7.5,
+      "poster": "https://image.tmdb.org/t/p/w780/b7Dr8Chzse8VagexAporUu2RtLx.jpg",
+      "link": "https://www.zee5.com/movies/details/the-invite/0-0-1z51076474"
+    }
+  ]
+}

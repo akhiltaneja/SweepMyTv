@@ -6,6 +6,6 @@
   "scripts": {
     "prepare:site": "python3 prepare.py",
     "dev": "node server.mjs",
-    "check": "node --check dist/app.js && node --check server.mjs"
+    "check": "node --check dist/app.js && node --check dist/tvs.js && node --check dist/tutorials.js && node --check dist/recommendation-engine/engine.js && node --check server.mjs"
   }
 }
