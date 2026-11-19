@@ -1,18 +1,27 @@
 {
   "repository": "Gathin23/cleanyourtv",
-  "release": "v3.4.0",
-  "commit": "fc148d5a9707b30e8f49f489625947421740dc55",
-  "reviewed_on": "2026-11-10",
+  "release": "v3.5.0",
+  "commit": "d11bd68c9ac45b2fb38480941586d17930137e9d",
+  "reviewed_on": "2026-11-15",
   "review_scope": "Directly adapted shared source components; not a wholesale import of the upstream launcher, themes, addons or cleanup rules",
   "components": [
     {
       "name": "ServiceRepair",
       "upstream_path": "launcher/app/src/main/java/com/gathin/tvhome/ServiceRepair.java",
-      "upstream_sha256": "092701b48294af6a0d257e78e072fbfb7caf29c1887b6fce1fe3c8e61b5a2a15",
-      "upstream_git_blob": "8ee8afd8468c7df1cfe4a62efa1c4f01ceeeaae2",
+      "upstream_sha256": "8645ac4d587139a5ed1c1861e00133e57c1ee01bdf3818ff2f3f7ef62ca98845",
+      "upstream_git_blob": "44670474563cdc9352909fbc841a268db407900c",
       "local_path": "app/src/main/java/com/sweepmytv/launcher/ServiceRepair.java",
-      "local_sha256": "d51936525b95852542e0dddc6e205ab6e9db8807c8b6d259d245fa56851c2166",
-      "disposition": "Upstream file is byte-identical at v3.2.0 and v3.4.0. Existing Sweep TV adaptation retained."
+      "local_sha256": "1e7b1d3f9dde3f34083afa562f38032ae5e91494442e772d19933cf43ec27d3c",
+      "disposition": "Reviewed v3.5.0 accessibility master-switch recovery. Sweep TV already checks and rebinds listed services; retained its existing recovery behavior."
+    },
+    {
+      "name": "Home network manager context",
+      "upstream_path": "launcher/app/src/main/java/com/gathin/tvhome/MainActivity.java",
+      "upstream_sha256": "fb9b1482e5cd8ab942f302439765cf12d68ebb11f885efc9957fb84a2a4a242a",
+      "upstream_git_blob": "717aa15805c27846fe6199fd28b611d7b2c9b7c0",
+      "local_path": "app/src/main/java/com/sweepmytv/launcher/HomeActivity.java",
+      "local_sha256": "f777a7b0508b8f639f10dc15ca008f71ccc3491c9b9ce2dfdeb32075749d7b96",
+      "disposition": "Adapted only the application-context lookup in CleanYourTV PR #3804 (a4311e8). The upstream glass focus listener and OpenOnStart changes do not apply."
     }
   ],
   "policy": {

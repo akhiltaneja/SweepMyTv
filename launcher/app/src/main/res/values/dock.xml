@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The starting dock, left to right (7 apps). Rearrange on the TV by holding OK on an app;
-         apps that aren't installed are skipped and the dock fills up from the rest. -->
+    <!-- Preferred entertainment apps for the starting Dock. Other installed media apps can fill spare slots. -->
     <string-array name="dock_packages">
         <item>in.startv.hotstar</item>
         <item>com.google.android.youtube.tv</item>
@@ -10,5 +9,10 @@
         <item>com.graymatrix.did</item>
         <item>tv.airtel.xstream.tvapp</item>
         <item>com.apple.atve.androidtv.appletv</item>
+        <item>com.crunchyroll.crunchyroid</item>
+        <item>com.formulaone.production</item>
+        <item>com.sonyliv</item>
+        <item>com.xiaomitv.sonyliv</item>
+        <item>com.spotify.tv.android</item>
     </string-array>
 </resources>

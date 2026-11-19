@@ -49,7 +49,9 @@ public class WatchService extends NotificationListenerService {
 
         void update() {
             String now = text(c.getMetadata(), MediaMetadata.METADATA_KEY_DISPLAY_TITLE, MediaMetadata.METADATA_KEY_TITLE);
-            boolean playing = c.getPlaybackState() != null && c.getPlaybackState().getState() == PlaybackState.STATE_PLAYING;
+            // A player can tear down between calls. Use one playback-state snapshot.
+            PlaybackState state = c.getPlaybackState();
+            boolean playing = state != null && state.getState() == PlaybackState.STATE_PLAYING;
             if (!playing || now.isEmpty() || isAppName(c.getPackageName(), now)) {
                 main.removeCallbacks(save);
                 title = "";
@@ -57,8 +59,6 @@ public class WatchService extends NotificationListenerService {
             }
             if (!now.equals(title)) {  // a new title started: wait 20 s before saving it
                 title = now;
-                logKeys(c.getPackageName(), c.getMetadata());
-                Log.i("GlassRecent", c.getPackageName() + " playing a new title; saving it after 20 s");
                 main.removeCallbacks(save);
                 main.postDelayed(save, MIN_PLAY_MS);
             }
@@ -164,21 +164,6 @@ public class WatchService extends NotificationListenerService {
             if (v != null && v.toString().trim().length() > 0) return v.toString().trim();
         }
         return "";
-    }
-
-    /** What the app shares besides the title (keys, links, picture sizes), for working out artwork. */
-    private static void logKeys(String pkg, MediaMetadata m) {
-        if (m == null) return;
-        StringBuilder b = new StringBuilder(pkg).append(" metadata:");
-        for (String k : m.keySet()) {
-            Bitmap bm = m.getBitmap(k);
-            CharSequence t = bm == null ? m.getText(k) : null;
-            b.append(' ').append(k.replace("android.media.metadata.", "")).append('=');
-            if (bm != null) b.append(bm.getWidth()).append('x').append(bm.getHeight());
-            else if (t != null) b.append('"').append(t.length() > 90 ? t.subSequence(0, 90) + "…" : t).append('"');
-            else b.append(m.getLong(k));
-        }
-        Log.i("GlassRecent", b.toString());
     }
 
     static Bitmap art(MediaMetadata m) {

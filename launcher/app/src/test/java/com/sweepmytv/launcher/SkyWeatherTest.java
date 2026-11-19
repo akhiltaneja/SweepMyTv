@@ -62,6 +62,10 @@ public class SkyWeatherTest {
         assertTrue(weather.sky(now).solarKnown);
         java.nio.file.Files.write(file.toPath(),"Mumbai, India".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         assertFalse(weather.sky(now).solarKnown);assertNull(weather.cached());
-        assertTrue(file.delete());weather.automatic(false);assertEquals("Off",weather.locationLabel());assertFalse(weather.sky(now).solarKnown);
+        assertTrue(file.delete());
+        assertTrue(weather.locationLabel().startsWith("Auto · "));
+        app.getSharedPreferences("home", 0).edit().putBoolean("automatic_city", false).commit();
+        assertEquals("Off", weather.locationLabel());
+        assertFalse(weather.sky(now).solarKnown);
     }
 }

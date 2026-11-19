@@ -23,16 +23,19 @@ public class Backdrop extends View {
     private static final long FADE_MS = 450;
     private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private final RectF full = new RectF();
+    private final RectF wallpaperBounds = new RectF();
     private int bgTop, bgBottom, scrimTop, scrimMid, scrimBottom;
     private Bitmap image, cur, prev;
     private boolean wallpaper;
     private float imageAlpha;
     private int[] scrimStops;   // with a wallpaper: the veil Legibility worked out, top to bottom (null: the theme's)
     private int glow;           // with For You hidden: a soft glow in the focused app's colour (0: none)
-    private boolean day;
+    private boolean day, subduedGlow;
     private boolean timed;
     private int timedTop,timedMid,timedBottom;
     private long fadeStart;
+    private Shader themePreview;
+    private int[] previewColours;
     private Paint veil;         // with a wallpaper: the veil's gradient, made again when the veil or the height changes
     private int veilHeight;
 
@@ -41,8 +44,10 @@ public class Backdrop extends View {
         setWillNotDraw(false);
     }
 
-    void setTheme(boolean day, int bgTop, int bgBottom, int scrimTop, int scrimMid, int scrimBottom, float ambientAlpha) {
+    void setTheme(boolean day, int bgTop, int bgBottom, int scrimTop, int scrimMid, int scrimBottom, float ambientAlpha,
+                  boolean subduedGlow) {
         this.day = day;
+        this.subduedGlow = subduedGlow;
         this.bgTop = bgTop;
         this.bgBottom = bgBottom;
         this.scrimTop = scrimTop;
@@ -119,11 +124,12 @@ public class Backdrop extends View {
         }
         if (glow != 0 && image == null && !timed) {
             // Strongest left of centre, fading out well before the edges; fainter on the light theme.
-            int a = day ? 0x66 : 0xF0, rgb = glow & 0x00FFFFFF;
+            int a = subduedGlow ? 0x78 : day ? 0x66 : 0xF0;
+            int rgb = glow & 0x00FFFFFF;
             p.setShader(new RadialGradient(w * 0.36f, h * 0.5f, w * 0.62f, new int[]{(a << 24) | rgb, ((a * 2 / 5) << 24) | rgb, rgb},
                     new float[]{0f, 0.4f, 1f}, Shader.TileMode.CLAMP));
             c.drawRect(0, 0, w, h, p);
-            if (!day) {
+            if (!day && !subduedGlow) {
                 // Deepen the glow's centre colour so it reads as a lit backdrop, not a flat tint.
                 p.setShader(new RadialGradient(w * 0.36f, h * 0.5f, w * 0.3f, new int[]{0x66000000 | rgb, rgb}, null, Shader.TileMode.CLAMP));
                 c.drawRect(0, 0, w, h, p);
@@ -139,15 +145,45 @@ public class Backdrop extends View {
         invalidate();
     }
 
+    void setThemePreview(int top, int middle, int bottom) {
+        if (previewColours != null && previewColours[0] == top && previewColours[1] == middle
+                && previewColours[2] == bottom) return;
+        previewColours = new int[]{top, middle, bottom};
+        themePreview = null;
+        invalidate();
+    }
+
+    void clearThemePreview() {
+        if (previewColours == null) return;
+        previewColours = null;
+        themePreview = null;
+        invalidate();
+    }
+
+    @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
+        super.onSizeChanged(width, height, oldWidth, oldHeight);
+        themePreview = null;
+    }
+
     @Override protected void onDraw(Canvas canvas) {
         full.set(0, 0, getWidth(), getHeight());
+        if (previewColours != null && full.height() > 0) {
+            if (themePreview == null) themePreview = new LinearGradient(0, 0, full.width() * .2f,
+                    full.height(), previewColours, null, Shader.TileMode.CLAMP);
+            paint.setAlpha(255);
+            paint.setShader(themePreview);
+            canvas.drawRect(full, paint);
+            paint.setShader(null);
+            return;
+        }
         if (wallpaper && image != null) {
             // Centre crop at the screen's size, so the photo stays sharp, then the veil that keeps text readable.
             float s = Math.max(full.width() / image.getWidth(), full.height() / image.getHeight());
             float iw = image.getWidth() * s, ih = image.getHeight() * s;
             paint.setAlpha(255);
-            canvas.drawBitmap(image, null, new RectF((full.width() - iw) / 2, (full.height() - ih) / 2,
-                    (full.width() + iw) / 2, (full.height() + ih) / 2), paint);
+            wallpaperBounds.set((full.width() - iw) / 2, (full.height() - ih) / 2,
+                    (full.width() + iw) / 2, (full.height() + ih) / 2);
+            canvas.drawBitmap(image, null, wallpaperBounds, paint);
             if (veil == null || veilHeight != getHeight()) {
                 int[] scrim = scrimStops != null ? scrimStops : new int[]{scrimTop, scrimMid, scrimBottom};
                 veil = new Paint();

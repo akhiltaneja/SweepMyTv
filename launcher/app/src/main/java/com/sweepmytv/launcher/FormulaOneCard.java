@@ -15,14 +15,18 @@ import android.view.View;
 
 /** Reference-style native widgets with real portraits, team marks and circuit art. */
 final class FormulaOneCard extends View {
+    private static final int RED = 0xFFE10600, WHITE = 0xFFF7F7FB;
+    private static final int MUTED = 0xFFB0B0BC, TRACK = 0xFF2C2C36;
+    private static final float RADIUS = 10;
     private final FormulaOne.Card card;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final RectF bounds = new RectF();
     private final Rect visible = new Rect();
+    private final Path clip = new Path(), stripe = new Path();
     private final float dp;
     private final Typeface regular, bold;
     private final Drawable logo;
-    private Shader fill;
+    private Shader fill, raceHeader;
     private boolean focusedWindow;
     private final F1Assets.Loader assetLoader;
     private java.util.concurrent.Future<?> assetRequest;
@@ -42,10 +46,14 @@ final class FormulaOneCard extends View {
     }
     FormulaOneCard(Context context,FormulaOne.Card card,F1Assets.Loader assetLoader) {
         super(context); this.card = card; this.assetLoader=assetLoader; dp = getResources().getDisplayMetrics().density;
-        regular = Typeface.create("sans-serif", Typeface.NORMAL); bold = Typeface.create("sans-serif", Typeface.BOLD);
+        regular = Typeface.create("sans-serif", Typeface.NORMAL);
+        bold = Typeface.create("sans-serif-condensed", Typeface.BOLD);
         logo = context.getDrawable(R.drawable.f1_mark);
-        setContentDescription(card.kicker + ", " + card.title + ", " + card.metric + ", " + card.body);
+        setContentDescription((card.champion ? "Champions, " : card.kicker + ", ")
+                + card.title + ", " + card.metric + ", " + card.body);
     }
+    int focusAccent() { return card.champion ? 0xFFFFD77A : 0xFFFF6A63; }
+
     @Override protected void onAttachedToWindow() {
         super.onAttachedToWindow();focusedWindow=hasWindowFocus();restart();
         final int generation=++assetGeneration;
@@ -61,16 +69,24 @@ final class FormulaOneCard extends View {
     @Override public void onWindowFocusChanged(boolean focus) { super.onWindowFocusChanged(focus); focusedWindow = focus; restart(); }
     private void restart() { removeCallbacks(tick); if (focusedWindow && card.target > 0) post(tick); }
     @Override protected void onSizeChanged(int w, int h, int oldW, int oldH) {
-        int tint = "next".equals(card.key) ? 0xFF39362E : "drivers".equals(card.key) ? 0xFF155448 : 0xFF303132;
-        fill = new LinearGradient(0, 0, w, h, new int[]{tint, 0xFF111214}, null, Shader.TileMode.CLAMP);
+        fill = new LinearGradient(0, 0, w, h, card.champion ? 0xFF68481C : 0xFF22222D,
+                card.champion ? 0xFF26180B : 0xFF111118, Shader.TileMode.CLAMP);
+        raceHeader = new LinearGradient(0, 0, w, 108 * dp, 0xFFAB0500, RED, Shader.TileMode.CLAMP);
+        bounds.set(.5f * dp, .5f * dp, w - .5f * dp, h - .5f * dp);
+        clip.reset();
+        clip.addRoundRect(bounds, RADIUS * dp, RADIUS * dp, Path.Direction.CW);
     }
     @Override protected void onDraw(Canvas canvas) {
         float w = getWidth() / dp, h = getHeight() / dp;
-        bounds.set(.5f * dp, .5f * dp, getWidth() - .5f * dp, getHeight() - .5f * dp);
-        paint.setShader(fill); canvas.drawRoundRect(bounds, 18 * dp, 18 * dp, paint); paint.setShader(null);
-        paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dp); paint.setColor(0x24FFFFFF);
-        canvas.drawRoundRect(bounds, 18 * dp, 18 * dp, paint); paint.setStyle(Paint.Style.FILL);
-        Path clip = new Path(); clip.addRoundRect(bounds, 18 * dp, 18 * dp, Path.Direction.CW); canvas.save(); canvas.clipPath(clip);
+        paint.setShader(fill);
+        canvas.drawRoundRect(bounds, RADIUS * dp, RADIUS * dp, paint);
+        paint.setShader(null);
+        paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dp); paint.setColor(TRACK);
+        canvas.drawRoundRect(bounds, RADIUS * dp, RADIUS * dp, paint);
+        paint.setStyle(Paint.Style.FILL);
+        canvas.save();
+        canvas.clipPath(clip);
+        if (!"next".equals(card.key)) block(canvas, 0, 0, w, 2, card.champion ? 0xFFFFD77A : RED);
         if ("next".equals(card.key)) next(canvas, w, h);
         else if ("drivers".equals(card.key) || "teams".equals(card.key)) champion(canvas, w, h);
         else if ("weekend".equals(card.key)) weekend(canvas, w, h);
@@ -78,30 +94,43 @@ final class FormulaOneCard extends View {
         canvas.restore();
     }
     private void next(Canvas c, float w, float h) {
-        paint.setColor(0xFFE90012); c.drawCircle(35 * dp, 34 * dp, 20 * dp, paint); mark(c, 20, 30, 31, 8);
-        text(c, card.title.replace("Grand Prix", "GP"), 14, 65, 30, w - 80, 0xFFFFFFFF, true);
+        paint.setShader(raceHeader);
+        c.drawRect(0, 0, w * dp, 107 * dp, paint);
+        paint.setShader(null);
+        stripes(c, w, 0, 107, 0x24FFFFFF);
+        mark(c, 17, 17, 52, 13);
+        text(c, "NEXT GRAND PRIX", 10, 82, 28, w - 100, WHITE, true);
+        text(c, card.title.replace("Grand Prix", "GP"), 27, 16, 66, w - 32, WHITE, true);
         String date = card.lines.size() > 1 ? card.lines.get(1) : card.metric;
-        text(c, date, 8.5f, 65, 46, w - 80, 0xFFC5C4C1, false);
-        divider(c, 64, w);
-        text(c, card.lines.isEmpty() ? "NEXT GRAND PRIX" : card.lines.get(0), 10, 17, 81, w - 34, 0xFFE8E6E2, false);
-        if (circuit != null) image(c, circuit, new RectF(65, 88, w - 36, 173), false, 255);
-        else text(c, "NEXT GRAND PRIX", 19, 17, 130, w - 34, 0xFFFFFFFF, true);
-        text(c, "CHAMPIONSHIP LEADERS", 8, 17, 188, w - 34, 0xFFB5B6B4, true);
-        for (int i = 0; i < Math.min(3, card.table.size()); i++) {
-            FormulaOne.Line row = card.table.get(i); float x = 36 + i * 73;
-            avatar(c, row, x, 213, 19);
-            text(c, F1Assets.surname(row.name).toUpperCase(java.util.Locale.ROOT), 8, x - 24, 243, 62, 0xFFE2E2E2, true);
+        text(c, date, 10, 17, 88, w - 34, WHITE, false);
+
+        String place = card.lines.isEmpty() ? "" : card.lines.get(0);
+        text(c, place, 11, 17, 128, w - 34, WHITE, true);
+        if (circuit != null) {
+            image(c, circuit, new RectF(48, 135, w - 33, 180), false, 235);
+        } else if (!card.body.isEmpty()) {
+            String[] details = card.body.split("\n");
+            if (details.length > 1) text(c, details[1], 10, 17, 149, w - 34, MUTED, false);
+            if (details.length > 2) text(c, details[2].toUpperCase(java.util.Locale.ROOT), 9, 17, 171, w - 34, MUTED, true);
         }
-        paint.setColor(0x24FFFFFF); c.drawRoundRect(new RectF(17 * dp, 254 * dp, (w - 17) * dp, 290 * dp), 18 * dp, 18 * dp, paint);
-        text(c, "RACE IN", 8.5f, 29, 276, 47, 0xFFC4C5C4, true);
+        divider(c, 180, w);
+        if (!card.table.isEmpty()) text(c, "CHAMPIONSHIP LEADERS", 8.5f, 17, 195, w - 34, MUTED, true);
+        for (int i = 0; i < Math.min(3, card.table.size()); i++) {
+            FormulaOne.Line row = card.table.get(i); float x = 38 + i * 76;
+            avatar(c, row, x, 217, 16);
+            text(c, F1Assets.surname(row.name).toUpperCase(java.util.Locale.ROOT), 8.5f, x - 22, 244, 66, WHITE, true);
+        }
+        block(c, 16, 254, w - 16, 289, 0xFF08080C);
+        block(c, 16, 254, 19, 289, RED);
+        text(c, card.target > 0 ? "RACE IN" : "STATUS", 9, 28, 275, 46, MUTED, true);
         String metric = card.target > 0 ? FormulaOne.countdown(card.target, System.currentTimeMillis()) : card.metric;
-        text(c, metric, 16.5f, 78, 278, w - 106, 0xFFFFFFFF, true);
-        foot(c, card.foot, w, h);
+        text(c, metric, card.target > 0 ? 19 : 12, 74, 278, w - 92, WHITE, true);
     }
     private void classification(Canvas c, float w, float h) {
-        mark(c, 16, 16, 43, 11);
-        text(c, "latest".equals(card.key) ? "RACE RESULT" : "SESSION RESULT", 9, w - 105, 25, 90, 0xFFEAEAEA, true);
-        divider(c, 38, w);
+        block(c, 0, 2, w, 37, 0xFF101017);
+        mark(c, 16, 14, 44, 11);
+        text(c, "latest".equals(card.key) ? "RACE RESULT" : "SESSION RESULT", 10, w - 107, 24, 92, WHITE, true);
+        divider(c, 37, w);
         text(c, card.title.replace("Grand Prix", "GP"), 13, 16, 56, w - 32, 0xFFFFFFFF, true);
         if (card.table.isEmpty()) {
             text(c, card.metric, 13, 16, 95, w - 32, 0xFFE7E7E7, true);
@@ -109,18 +138,22 @@ final class FormulaOneCard extends View {
         }
         for (int i = 0; i < Math.min(3, card.table.size()); i++) {
             FormulaOne.Line row = card.table.get(i); float y = 82 + i * 29;
-            text(c, row.rank, 10.5f, 16, y, 16, 0xFFAFAFAF, false);
+            block(c, 15, y - 12, 32, y + 6, i == 0 ? RED : TRACK);
+            text(c, row.rank, 10, 20, y + 1, 11, WHITE, true);
             avatar(c, row, 47, y - 4, 12.5f);
             image(c, pictures.get(row.logo), new RectF(66, y - 13, 84, y + 5), true, 255);
             text(c, F1Assets.surname(row.name), 12, 92, y + 1, w - 175, 0xFFF8F8F8, true);
             text(c, row.value, 10.5f, w - 76, y + 1, 61, 0xFFEDEDED, false);
             divider(c, y + 13, w);
         }
-        foot(c, card.foot, w, h);
     }
     private void champion(Canvas c, float w, float h) {
         boolean driver = "drivers".equals(card.key);
-        text(c, driver ? "DRIVER LEADER" : "TEAM LEADER", 8, 13, 18, w - 26, 0xFFDFE4E1, true);
+        stripes(c, w, 2, h, 0x12FFFFFF);
+        String title = card.champion ? (driver ? "WORLD CHAMPION" : "CONSTRUCTORS’ CHAMPION")
+                : (driver ? "DRIVER LEADER" : "TEAM LEADER");
+        text(c, title, 9, 13, 18, w - (card.champion ? 39 : 26), card.champion ? 0xFFFFD77A : MUTED, true);
+        if (card.champion) crown(c, w - 25, 10);
         if (card.table.isEmpty()) { text(c, "Not loaded", 12, 13, 54, w - 26, 0xFFFFFFFF, true); return; }
         FormulaOne.Line leader = card.table.get(0);
         if (driver) {
@@ -139,9 +172,24 @@ final class FormulaOneCard extends View {
         text(c, "PTS", 8, 15, 89, 42, 0xFFBDC7C3, true);
         text(c, "Full standings  ›", 8, 13, 104, w - 26, 0xFFE0E3E1, false);
     }
+    private void crown(Canvas canvas, float left, float top) {
+        Path crown = new Path();
+        crown.moveTo(left * dp, (top + 2) * dp);
+        crown.lineTo((left + 3) * dp, (top + 5) * dp);
+        crown.lineTo((left + 6) * dp, top * dp);
+        crown.lineTo((left + 9) * dp, (top + 5) * dp);
+        crown.lineTo((left + 12) * dp, (top + 2) * dp);
+        crown.lineTo((left + 10) * dp, (top + 10) * dp);
+        crown.lineTo((left + 2) * dp, (top + 10) * dp);
+        crown.close();
+        paint.setColor(0xFFFFD77A);
+        canvas.drawPath(crown, paint);
+    }
+
     private void weekend(Canvas c, float w, float h) {
-        mark(c, 15, 12, 34, 8.5f);
-        text(c, "RACE WEEKEND", 9, 60, 20, w - 75, 0xFFF1F1F1, true);
+        block(c, 0, 2, w, 29, 0xFF101017);
+        mark(c, 15, 10, 36, 9);
+        text(c, "RACE WEEKEND", 10, 62, 20, w - 77, WHITE, true);
         divider(c, 29, w);
         int complete = 0;
         java.util.List<String> future = new java.util.ArrayList<>();
@@ -151,7 +199,6 @@ final class FormulaOneCard extends View {
             String line = future.get(i).replace(" · Scheduled", "").replace(" · Awaiting result", " · awaiting");
             text(c, line, 8.8f, 15, 62 + i * 15, w - 30, 0xFFECECEC, false);
         }
-        foot(c, card.foot, w, h);
     }
     private void avatar(Canvas c, FormulaOne.Line row, float x, float y, float r) {
         paint.setColor(row.color); c.drawCircle(x * dp, y * dp, r * dp, paint);
@@ -173,8 +220,24 @@ final class FormulaOneCard extends View {
         RectF dest = new RectF(target.centerX()-w/2, target.centerY()-h/2, target.centerX()+w/2, target.centerY()+h/2);
         paint.setAlpha(alpha); c.drawBitmap(b, null, scale(dest), paint); paint.setAlpha(255);
     }
+    private void block(Canvas c, float left, float top, float right, float bottom, int color) {
+        paint.setColor(color);
+        c.drawRect(left * dp, top * dp, right * dp, bottom * dp, paint);
+    }
+    private void stripes(Canvas c, float width, float top, float bottom, int color) {
+        paint.setColor(color);
+        for (int i = 0; i < 2; i++) {
+            float right = width - 12 + i * 27;
+            stripe.reset();
+            stripe.moveTo((right - 14) * dp, top * dp);
+            stripe.lineTo(right * dp, top * dp);
+            stripe.lineTo((right - 70) * dp, bottom * dp);
+            stripe.lineTo((right - 84) * dp, bottom * dp);
+            stripe.close();
+            c.drawPath(stripe, paint);
+        }
+    }
     private void divider(Canvas c, float y, float w) { paint.setColor(0x16FFFFFF); c.drawRect(15*dp,y*dp,(w-15)*dp,(y+.5f)*dp,paint); }
-    private void foot(Canvas c, String value, float w, float h) { text(c, value, 6.8f, 15, h-7, w-30, 0xFF8E9296, false); }
     private void text(Canvas c, String value, float size, float x, float y, float width, int color, boolean heavy) {
         paint.setTextSize(size*dp); paint.setColor(color); paint.setTypeface(heavy ? bold : regular);
         float available = Math.max(0,width*dp);

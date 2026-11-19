@@ -19,11 +19,12 @@ final class ChannelSnapshot {
         StringBuilder out=new StringBuilder();add(out,row.key);add(out,row.title);add(out,row.pkg);
         for(Trending.Pick p:row.items) {
             add(out,p.id);add(out,p.kind);add(out,p.pkg);add(out,p.title);add(out,p.meta);add(out,p.service);
-            add(out,p.progress);add(out,p.savedResume);add(out,p.intentUri);add(out,p.overview);add(out,p.year);add(out,p.rating);art(out,p.image);art(out,p.poster);
+            add(out,p.progress);add(out,p.savedResume);add(out,p.intentUri);add(out,p.overview);add(out,p.year);add(out,p.rating);add(out,p.ratingSource);art(out,p.image);art(out,p.poster);
+            if (p.extra instanceof RottenTomatoesPicks.Entry review) add(out, review.reviewUrl);
             if(p.extra instanceof HomeInsights.Card){HomeInsights.Card c=(HomeInsights.Card)p.extra;add(out,c.kind);add(out,c.kicker);add(out,c.metric);add(out,c.body);add(out,c.foot);add(out,c.detail);add(out,c.target);add(out,c.color);for(HomeInsights.Story story:c.stories){add(out,story.title);add(out,story.url);add(out,story.source);add(out,story.published);}}
             if(p.extra instanceof FormulaOne.Card){
                 FormulaOne.Card c=(FormulaOne.Card)p.extra;
-                add(out,c.key);add(out,c.title);add(out,c.kicker);add(out,c.body);add(out,c.metric);add(out,c.foot);add(out,c.target);add(out,c.live);
+                add(out,c.key);add(out,c.title);add(out,c.kicker);add(out,c.body);add(out,c.metric);add(out,c.foot);add(out,c.target);add(out,c.live);add(out,c.champion);
                 for(String line:c.lines)add(out,line);
                 for(FormulaOne.Line line:c.table){add(out,line.rank);add(out,line.name);add(out,line.value);add(out,line.team);add(out,line.portrait);add(out,line.logo);add(out,line.color);}
             }

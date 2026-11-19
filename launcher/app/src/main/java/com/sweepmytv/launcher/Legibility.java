@@ -6,8 +6,7 @@ import android.graphics.Bitmap;
  * Keeps text readable over a wallpaper (your own or Bing's). The photo is measured once, in strips from top to bottom,
  * and each strip gets just enough of the theme's veil (the scrim) for text to stand out at 4.5:1 contrast, the
  * WCAG level for body text, on nine in ten of its pixels: white text needs the strip dark enough, dark text light
- * enough. A dark photo gets little or no veil in the dark look; a bright one, in the light look. With Appearance on
- * Auto, Talkies picks whichever look the photo needs less veil for.
+ * enough. A dark photo gets little or no veil in the dark look; a bright one, in the light look.
  */
 final class Legibility {
     /** Gradient stops, top to bottom, evenly spaced. */
@@ -28,13 +27,6 @@ final class Legibility {
     private Legibility(float[] forDark, float[] forLight) {
         this.forDark = forDark;
         this.forLight = forLight;
-    }
-
-    /** True when the photo suits dark text (the light look) better than white. */
-    boolean prefersLight() {
-        float d = 0, l = 0;
-        for (int i = 0; i < STOPS; i++) { d += forDark[i]; l += forLight[i]; }
-        return l < d;
     }
 
     static Legibility of(Bitmap photo, int darkScrimRgb, int lightScrimRgb) {

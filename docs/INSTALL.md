@@ -27,7 +27,7 @@ SweepMyTV requires an **Android TV or Google TV device running Android 8.0 or ne
 
 ## Install from an Android phone
 
-1. Download `sweep-tv.apk` from the Assets section of the [signed preview release](https://github.com/akhiltaneja/SweepMyTv/releases/tag/v1.3.0-sweep.25). Install [Send Files to TV](https://play.google.com/store/apps/details?id=com.yablio.sendfilestotv) on your phone and TV.
+1. Download `sweep-tv.apk` from the Assets section of the [signed preview release](https://github.com/akhiltaneja/SweepMyTv/releases/tag/v1.3.0-sweep.151). Install [Send Files to TV](https://play.google.com/store/apps/details?id=com.yablio.sendfilestotv) on your phone and TV.
 2. Connect both devices to the same Wi-Fi. Open Send Files to TV on the TV and choose **Receive**. On the phone, choose **Send**, select the APK, and pick your TV.
 3. Open the received APK with the TV’s file manager or directly from the transfer app if it offers that option. If Android asks, allow installation from the app opening the file. Choose **Install**, then open Sweep TV from the TV’s Apps screen.
 
@@ -36,7 +36,7 @@ If your TV supports USB drives, you can put the APK on a drive and open it with 
 ## Install from a laptop
 
 1. Download and extract [Android Platform Tools](https://developer.android.com/tools/releases/platform-tools) for macOS, Windows, or Linux. Open a terminal in the extracted directory. The examples use `adb`. Use `./adb` on macOS or Linux, or `.\adb.exe` in PowerShell if it is outside your PATH.
-2. Download `sweep-tv.apk` and `SHA256SUMS` from the Assets section of the [signed preview release](https://github.com/akhiltaneja/SweepMyTv/releases/tag/v1.3.0-sweep.25). Verify the APK’s SHA-256 against the matching line in `SHA256SUMS`. Run `shasum -a 256 sweep-tv.apk` on macOS, `sha256sum sweep-tv.apk` on Linux, or `Get-FileHash .\sweep-tv.apk -Algorithm SHA256` in PowerShell. Run the check from the APK’s download folder or use its full path.
+2. Download `sweep-tv.apk` and `SHA256SUMS` from the Assets section of the [signed preview release](https://github.com/akhiltaneja/SweepMyTv/releases/tag/v1.3.0-sweep.151). Verify the APK’s SHA-256 against the matching line in `SHA256SUMS`. Run `shasum -a 256 sweep-tv.apk` on macOS, `sha256sum sweep-tv.apk` on Linux, or `Get-FileHash .\sweep-tv.apk -Algorithm SHA256` in PowerShell. Run the check from the APK’s download folder or use its full path.
 3. Put the laptop and TV on the same Wi-Fi. On the TV, open **Settings → About** and select **Build** seven times, or until Developer options appear. Enable **Wireless debugging** or the **Network/ADB debugging** option your TV provides.
 
 ### Connect to the TV
@@ -72,8 +72,9 @@ Wait for `Success` and open Sweep TV from Apps. The `-r` flag preserves data whe
 
 Follow the [first-time setup guide](https://sweepmytv.com/tutorials/first-time-setup/) after installing.
 
-- **Open Sweep TV** from Apps. If your TV offers a **Home app** picker, use it to select Sweep TV. If the physical Home button still goes to stock Home, review **Finish setup → Home button** and enable the optional helper only if needed.
+- **Open Sweep TV** from Apps. If your TV offers a **Home app** picker, use it to select Sweep TV. If the physical Home button still goes to stock Home, review **System → Finish setup → Home button helper** and enable the optional helper only if needed.
 - **Set up Continue Watching** by reviewing **Notification access** and **Read TV listings** in Finish setup if they are available on your TV. What appears depends on the apps that share playback information.
+- **Choose your sports.** In **System → Finish setup**, enable Formula 1, Cricket, or both under **Sports to follow**. Both start off when you have no saved choice.
 - **Make it yours.** Choose your dock apps and theme in Sweep TV settings. You can install and use the launcher without a catalog key. The available discovery options depend on your build.
 - **Check your TV.** Try the physical remote, streaming playback, and any inputs you use. [Report your TV](https://github.com/akhiltaneja/SweepMyTv/issues/new?template=tv-test.yml) with its model and firmware if you can share your results.
 

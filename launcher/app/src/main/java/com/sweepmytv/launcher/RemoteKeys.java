@@ -15,11 +15,11 @@ import java.util.TreeMap;
 
 /**
  * Remote keys (Control Center → Remote keys): a button on the remote given another job, e.g. the Netflix button
- * opening JioHotstar. SleepService, Talkies' accessibility service, sees the press before the TV does and does
+ * opening JioHotstar. SleepService, Sweep TV' accessibility service, sees the press before the TV does and does
  * the job instead; buttons with no job pass through untouched. Kept in the "remote_keys" preferences as
  * key code → action: "app:<package>", "inputs", "home" or "none" ("k<code>"), and the job for holding the button
  * ("h<code>"), which only a button with a press job can have: a press with no job has to reach the TV untouched,
- * and Talkies can't tell a press from a hold until the button is let go. An idea from Plume and CleanYourTV.
+ * and Sweep TV can't tell a press from a hold until the button is let go. An idea from Plume and CleanYourTV.
  *
  * A button is known by its key code, or, for one Android has no code for (KEYCODE_UNKNOWN: the app buttons on some
  * remotes, such as the Mi Box's Netflix and Prime Video), by its scan code from the remote, stored negated so it
@@ -27,6 +27,15 @@ import java.util.TreeMap;
  */
 final class RemoteKeys {
     static final String INPUTS = "inputs", HOME = "home", NONE = "none", APP = "app:", RECENTS = "recents";
+    static final String APP_DRAWER = "app_drawer";
+    static final String APP_DRAWER_GESTURE = "app_drawer_gesture";
+    static final String DOUBLE_HOME_DRAWER = "double_home_drawer";
+    static final String DRAWER_GESTURE_USED = "drawer_gesture_used";
+
+    static boolean doubleHomeDrawer(Context context) {
+        return HomeOptions.prefs(context).getBoolean(DOUBLE_HOME_DRAWER, true);
+    }
+
     static final String EXTRA_OPEN = "com.sweepmytv.launcher.OPEN";
 
     private RemoteKeys() { }
@@ -103,6 +112,7 @@ final class RemoteKeys {
         if (action == null) return "Normal";
         if (action.equals(INPUTS)) return "Inputs";
         if (action.equals(RECENTS)) return "Recent apps";
+        if (action.equals(APP_DRAWER)) return "App drawer";
         if (action.equals(HOME)) return "Sweep TV";
         if (action.equals(NONE)) return "Nothing";
         if (action.startsWith(APP)) return "Open " + Channels.label(c.getPackageManager(), action.substring(APP.length()));
@@ -114,7 +124,8 @@ final class RemoteKeys {
         try {
             if (action.equals(HOME)) {
                 s.openHome();
-            } else if (action.equals(INPUTS) || action.equals(RECENTS)) {
+            } else if (action.equals(INPUTS) || action.equals(RECENTS)
+                    || action.equals(APP_DRAWER) || action.equals(APP_DRAWER_GESTURE)) {
                 s.startActivity(new Intent(Intent.ACTION_MAIN).setClass(s, HomeActivity.class).putExtra(EXTRA_OPEN, action)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
             } else if (action.startsWith(APP)) {

@@ -55,6 +55,19 @@ public class FormulaOneTest {
         assertTrue(card(cards, "teams").metric.contains("607"));
     }
 
+    @Test public void championRequiresMorePointsThanRivalsCanStillEarn() throws Exception {
+        JSONObject season = new JSONObject().put("season", 2026).put("round", 1);
+        JSONObject first = new JSONObject().put("position", 1).put("points", 90);
+        JSONArray standings = new JSONArray().put(first).put(new JSONObject().put("position", 2).put("points", 57));
+        JSONObject finale = new JSONObject().put("season", 2026).put("round", 2).put("Sprint", new JSONObject());
+        List<JSONObject> calendar = java.util.Arrays.asList(
+                new JSONObject().put("season", 2026).put("round", 1), finale);
+        assertFalse(FormulaOne.titleClinched(calendar, season, standings, true));
+        first.put("points", 91);
+        assertTrue(FormulaOne.titleClinched(calendar, season, standings, true));
+        assertFalse(FormulaOne.titleClinched(java.util.Collections.singletonList(finale), season, standings, true));
+    }
+
     @Test public void onlyFreshSourceConfirmedSessionsAreLive() throws Exception {
         FormulaOne.State state = fixture(NOW);
         JSONObject session = state.raw.getJSONObject("status").getJSONArray("events").getJSONObject(0).getJSONArray("competitions").getJSONObject(0);

@@ -11,9 +11,9 @@ launcher install, cleanup rerun or new Android permission.
   Profile and greeting settings let users enter/remove their name and independently
   hide either part. New installs use a greeting without a name. This TV is
   configured with Akhil. No Google account identity APIs are queried.
-- The old RAM/storage bars are replaced by a small status pill below the controls.
-  RAM, storage, TV uptime and Codex quota can each be enabled or disabled; the
-  entire widget can also be hidden. RAM and storage figures are free capacity.
+- The status widget sits beside the rotating header card. RAM, storage and TV
+  uptime can each be hidden, or the entire widget can be turned off. RAM and
+  storage figures are free capacity.
 - Hold OK on a card in any row below the dock for **Remove section from Home**.
   This hides the whole row locally and preserves its app, content and resume links.
   Restore it under **Home sections**. The same menu works on F1, recommendations,
@@ -33,32 +33,6 @@ use Sweep TV. About retains the original Talkies/TechPP source credit, MIT copyr
 and permission notice, and all third-party notices. Full licence text is readable
 with the remote. Data-provider notices remain, including TMDB's required wording.
 This is a rebranded derivative; the original code's authorship is not reassigned.
-
-## Optional Codex companion
-
-Official protocol: https://learn.chatgpt.com/docs/app-server
-
-`companion/codex_usage.py` uses local `codex app-server` over stdio. It calls only
-initialize, account/read, account/rateLimits/read and optionally account/usage/read.
-There are no model turns, purchases, reset-credit actions, account changes or login
-flows. Existing Codex sign-in stays on the Mac. The TV receives an allowlisted JSON
-snapshot with quota percentage, window length and reset timestamp. It never receives
-account email, tokens, credentials or chat content.
-
-From the workspace root:
-
-```
-python3 launcher/companion/codex_usage.py --device 192.168.0.245:5555
-python3 launcher/companion/codex_usage.py --device 192.168.0.245:5555 --watch
-```
-
-The watch option reads and syncs every five minutes while that process, this Mac and
-ADB are available. It is not installed as a login item or persistent OS service.
-The widget labels the quota window (for example `week`) and remaining percentage.
-Data older than 15 minutes, or past its reset timestamp, shows **Sync needed**.
-Settings includes snapshot age. A sync failure preserves the prior snapshot,
-without pretending that it is current. Other users must opt into their own companion
-and sign-in; authentication is not embedded in the APK.
 
 ## CleanYourTV release review
 

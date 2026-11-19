@@ -14,7 +14,12 @@ import java.util.List;
 
 /** Exact-title catalog artwork, separate from captured playback artwork. Network calls run off the UI thread. */
 final class TitleArtwork {
-    private static final int MATCHING_VERSION=3;
+    private static final int MATCHING_VERSION=4;
+    private static final int GRAND_TOUR_2026 = 329471;
+    // The verified Prime Video banner with the 2026 cast. Its filename is a SHA-256 of the provider artwork.
+    private static final String GRAND_TOUR_2026_COVER =
+            "asset_2b3010ed2bc7375e3a5ac8dd577a881ec76636295aae2a764daf501255df17d8.img";
+    private static final String GRAND_TOUR_2026_PRIME_ID = "0HJALB095O1KZ90Z1DO6N7Q37P";
     private TitleArtwork(){}
     static final class Pair {
         File landscape,portrait;
@@ -23,39 +28,68 @@ final class TitleArtwork {
         void fill(Pair fallback){if(landscape==null)landscape=fallback.landscape;if(portrait==null)portrait=fallback.portrait;}
         void put(Trending.Pick p){p.image=landscape;p.poster=portrait;}
     }
-    interface Catalog {JSONObject get(String path)throws Exception;File image(String path)throws Exception;}
+    @FunctionalInterface
+    interface MetadataLookup { JSONObject get(String path) throws Exception; }
+    interface Catalog extends MetadataLookup { File image(String path) throws Exception; }
     private static String key(Trending.Pick p){return ArtworkAssets.hash(p.pkg+"\n"+queryTitle(p.title)+"\n"+java.util.Locale.getDefault().getLanguage());}
     private static File index(Context c,Trending.Pick p,String role){return new File(ArtworkAssets.dir(c),role+"_"+key(p)+".json");}
     private static Pair read(Context c,JSONObject value){File wide=ArtworkAssets.saved(c,value.optString("landscape")),tall=ArtworkAssets.saved(c,value.optString("portrait"));return new Pair(ArtworkAssets.landscape(wide)?wide:null,ArtworkAssets.portrait(tall)?tall:null);}
     private static JSONObject json(Pair pair)throws Exception{return new JSONObject().put("landscape",pair.landscape==null?"":pair.landscape.getName()).put("portrait",pair.portrait==null?"":pair.portrait.getName());}
-    static void applyCached(Context c,Trending.Pick p){read(c,ArtworkAssets.read(index(c,p,"selection"))).put(p);}
+    static boolean prefersCatalog(String pkg) {
+        return Cricket.SONYLIV.equals(pkg) || "com.xiaomitv.sonyliv".equals(pkg);
+    }
+
+    static int verifiedSeries(Trending.Pick pick, File provider) {
+        if (!Cricket.PRIME.equals(pick.pkg) || !"thegrandtour".equals(normalize(pick.title))) return 0;
+        if (provider != null && GRAND_TOUR_2026_COVER.equals(provider.getName())) return GRAND_TOUR_2026;
+        return pick.intentUri != null && pick.intentUri.contains(GRAND_TOUR_2026_PRIME_ID) ? GRAND_TOUR_2026 : 0;
+    }
+
+    static void applyCached(Context c,Trending.Pick p){
+        if(prefersCatalog(p.pkg))resolve(c,p,null).put(p);
+        else read(c,ArtworkAssets.read(index(c,p,"selection"))).put(p);
+    }
     /** Only an explicit, separate poster field is trusted as title art; an ambiguous thumbnail may be a playback still. */
     static void apply(Context c,Trending.Pick p,String posterUri,String thumbnailUri){
         apply(c,p,posterUri,thumbnailUri,false);
     }
     static void apply(Context c,Trending.Pick p,String posterUri,String thumbnailUri,boolean titleLevel){
-        File provider=posterUri==null||posterUri.isEmpty()||posterUri.equals(thumbnailUri)?null:ArtworkAssets.load(c,posterUri);
+        File provider=prefersCatalog(p.pkg)||posterUri==null||posterUri.isEmpty()||posterUri.equals(thumbnailUri)?null:ArtworkAssets.load(c,posterUri);
         // An episode's landscape "poster" may still be a scene, as Apple TV publishes for Monarch.
         if(!titleLevel&&AppleResumeCache.PACKAGE.equals(p.pkg)&&!ArtworkAssets.portrait(provider))provider=null;
         apply(c,p,provider,catalog(c));
     }
     static void apply(Context c,Trending.Pick p,File provider,Catalog api){
+        if(prefersCatalog(p.pkg))provider=null;
         Pair selected=new Pair();if(ArtworkAssets.landscape(provider))selected.landscape=provider;else if(ArtworkAssets.portrait(provider))selected.portrait=provider;
-        if(selected.landscape==null||selected.portrait==null)selected.fill(resolve(c,p,api));
+        if(selected.landscape==null||selected.portrait==null)selected.fill(resolve(c,p,api,verifiedSeries(p,provider),false));
         selected.put(p);saveSelection(c,p,selected);
     }
     private static void saveSelection(Context c,Trending.Pick p,Pair pair){try{ArtworkAssets.write(index(c,p,"selection"),json(pair));}catch(Exception ignored){}}
     static void restoreCached(Context c,Trending.Pick p,boolean titleSnapshot){
+        if(prefersCatalog(p.pkg)){applyCached(c,p);return;}
         File provider=p.poster;Pair selected=read(c,ArtworkAssets.read(index(c,p,"selection")));
         if(titleSnapshot){if(selected.landscape==null&&selected.portrait==null){if(ArtworkAssets.landscape(p.image))selected.landscape=p.image;if(ArtworkAssets.portrait(p.poster))selected.portrait=p.poster;}}
         else if(ArtworkAssets.portrait(provider))selected.portrait=provider;
         selected.put(p);
     }
     static void resolveRecent(Context c,List<Trending.Pick> list){
-        if(ContinueOptions.titleArtwork(c))resolveRecent(c,list,catalog(c));
+        if (list.isEmpty()) return;
+        Catalog api = catalog(c);
+        if (ContinueOptions.titleArtwork(c)) {
+            resolveRecent(c,list,api);
+        } else {
+            for (Trending.Pick pick : list) {
+                if (ContinueOptions.include(c,pick.pkg) && !ArtworkAssets.portrait(pick.poster)
+                        && !ArtworkAssets.portrait(pick.image)) {
+                    pick.poster = resolve(c,pick,api,verifiedSeries(pick,pick.image),true).portrait;
+                }
+            }
+        }
     }
     static void resolveRecent(Context c,List<Trending.Pick> list,Catalog api){
         for(Trending.Pick p:list)if(ContinueOptions.include(c,p.pkg)){
+            if(prefersCatalog(p.pkg)){resolve(c,p,api).put(p);continue;}
             Pair previous=withLegacy(c,p,read(c,ArtworkAssets.read(index(c,p,"catalog")))),fresh=resolve(c,p,api),selected=new Pair(p.image,p.poster);
             if(fresh.landscape!=null&&(selected.landscape==null||selected.landscape.equals(previous.landscape)))selected.landscape=fresh.landscape;
             else if(fresh.landscape==null&&fresh.portrait!=null&&java.util.Objects.equals(selected.landscape,previous.landscape)
@@ -66,12 +100,12 @@ final class TitleArtwork {
     }
     private static Catalog catalog(Context c){return catalogApi(c,ArtworkAssets.dir(c));}
     static Catalog catalogApi(Context c,File root){
-        String token=Keys.read(c,Keys.TMDB);if(token==null)return null;
+        String token=Keys.activeTmdbKey(c);if(token==null)return null;
         return new Catalog(){public JSONObject get(String path)throws Exception{return TitleArtwork.get(token,path);}public File image(String path){return ArtworkAssets.load(c,"https://image.tmdb.org/t/p/original"+path,root);}};
     }
     private static Pair withLegacy(Context c,Trending.Pick p,Pair selected){
         // Old files were exact-title TMDB catalog art, never the app's playback thumbnail.
-        if(selected.landscape==null&&selected.portrait==null){
+        if(!prefersCatalog(p.pkg)&&selected.landscape==null&&selected.portrait==null){
             File old=new File(c.getExternalFilesDir(null),"recent/title-artwork/"+ArtworkAssets.hash(p.pkg+"\n"+queryTitle(p.title))+".jpg");
             if(old.isFile()){
                 File saved=ArtworkAssets.load(c,android.net.Uri.fromFile(old).toString());
@@ -82,31 +116,86 @@ final class TitleArtwork {
         return selected;
     }
     static Pair resolve(Context c,Trending.Pick p,Catalog api){
+        return resolve(c,p,api,verifiedSeries(p,p.image),false);
+    }
+
+    private static Pair resolve(Context c,Trending.Pick p,Catalog api,int verifiedSeries,boolean portraitOnly){
         if(ContinueOptions.isYouTube(p.pkg))return new Pair();
-        File index=index(c,p,"catalog");JSONObject old=ArtworkAssets.read(index);Pair cached=read(c,old);long now=System.currentTimeMillis();
-        boolean current=old.optInt("matching_version")==MATCHING_VERSION;
+        // A verified edition must not share its lookup cache with the other series of the same name.
+        String role = verifiedSeries == 0 ? "catalog" : "catalog_tv_"+verifiedSeries;
+        File index = index(c,p,role);
+        if (portraitOnly) {
+            Pair existing = read(c,ArtworkAssets.read(index));
+            if (existing.portrait != null) return new Pair(null,existing.portrait);
+            index = index(c,p,"portrait_" + role);
+        }
+        JSONObject old=ArtworkAssets.read(index);Pair cached=read(c,old);long now=System.currentTimeMillis();
+        int version = old.optInt("matching_version");
+        boolean current = version == MATCHING_VERSION || version == 3 && cached.portrait != null;
+        if(prefersCatalog(p.pkg)&&!current)cached.landscape=null;
         boolean recentAttempt=old.optInt("attempt_version",old.optInt("matching_version"))==MATCHING_VERSION&&now-old.optLong("attempt")<ArtworkAssets.RETRY;
         if((current&&(cached.landscape!=null||cached.portrait!=null)&&now-old.optLong("checked")<ArtworkAssets.WEEK)||recentAttempt||api==null)return withLegacy(c,p,cached);
         String status="not_found";int matchedId=0;
+        boolean incomplete = false;
         try{
-            boolean episodic=episodic(p.meta);JSONArray rows=api.get((episodic?"/search/tv":"/search/multi")+"?include_adult=false&query="+URLEncoder.encode(queryTitle(p.title),"UTF-8")).optJSONArray("results");
-            if(episodic)for(int i=0;rows!=null&&i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row!=null&&!row.has("media_type"))row.put("media_type","tv");}
-            List<JSONObject> candidates=matches(rows,p.title,p.meta);JSONObject match=candidates.size()==1?candidates.get(0):matchSeason(candidates,p.meta,api);
-            if(!candidates.isEmpty()&&match==null)status="ambiguous";
+            JSONObject match;
+            if (verifiedSeries > 0) {
+                JSONObject series = api.get("/tv/" + verifiedSeries + "?append_to_response=external_ids");
+                JSONObject ids = series.optJSONObject("external_ids");
+                String imdb = ids == null || ids.isNull("imdb_id") ? "" : ids.optString("imdb_id", "");
+                if (series.optInt("id") != verifiedSeries || !"thegrandtour".equals(normalize(series.optString("name")))
+                        || !series.optString("first_air_date").startsWith("2026-")
+                        || !imdb.isEmpty() && !"tt44974627".equals(imdb)) {
+                    throw new java.io.IOException("Series identity could not be verified");
+                }
+                match = series.put("media_type", "tv");
+            } else {
+                boolean episodic=episodic(p.meta);
+                JSONArray rows=api.get((episodic?"/search/tv":"/search/multi")+"?include_adult=false&query="+URLEncoder.encode(queryTitle(p.title),"UTF-8")).optJSONArray("results");
+                if(episodic)for(int i=0;rows!=null&&i<rows.length();i++){
+                    JSONObject row=rows.optJSONObject(i);if(row!=null&&!row.has("media_type"))row.put("media_type","tv");
+                }
+                List<JSONObject> candidates=matches(rows,p.title,p.meta);
+                match=candidates.size()==1?candidates.get(0):matchSeason(candidates,p.meta,api::get);
+                if(!candidates.isEmpty()&&match==null)status="ambiguous";
+            }
             if(match!=null){
                 status="matched";matchedId=match.getInt("id");
-                String language=java.util.Locale.getDefault().getLanguage();JSONObject images=api.get("/"+match.getString("media_type")+"/"+match.getInt("id")+"/images?include_image_language="+URLEncoder.encode(language+",en,null","UTF-8"));
-                String landscape=titleCover(images.optJSONArray("backdrops"),language),portrait=choose(images.optJSONArray("posters"),true,language);
-                if(portrait==null&&validPath(match.optString("poster_path")))portrait=match.optString("poster_path");
-                File wide=landscape==null?null:api.image(landscape),tall=portrait==null?null:api.image(portrait);
-                if(landscape!=null&&!ArtworkAssets.landscape(wide))throw new java.io.IOException("Title cover unavailable");
-                if(ArtworkAssets.landscape(wide))cached.landscape=wide;
-                else if(ArtworkAssets.portrait(tall))cached.landscape=null;
-                if(ArtworkAssets.portrait(tall))cached.portrait=tall;
+                String language = java.util.Locale.getDefault().getLanguage();
+                JSONObject images = null;
+                try {
+                    images = api.get("/" + match.getString("media_type") + "/" + matchedId
+                            + "/images?include_image_language=" + URLEncoder.encode(language+",en,null","UTF-8"));
+                } catch (Exception unavailable) {
+                    incomplete = true;
+                }
+
+                String galleryPoster = images == null ? null : choose(images.optJSONArray("posters"),true,language);
+                String primaryPoster = match.optString("poster_path");
+                File tall = download(api,galleryPoster);
+                if (!ArtworkAssets.portrait(tall) && !primaryPoster.equals(galleryPoster) && validPath(primaryPoster)) {
+                    tall = download(api,primaryPoster);
+                }
+                if (ArtworkAssets.portrait(tall)) cached.portrait = tall;
+                else if (galleryPoster != null || validPath(primaryPoster)) incomplete = true;
+
+                if (!portraitOnly && images != null) {
+                    String landscape = titleCover(images.optJSONArray("backdrops"),language);
+                    File wide = download(api,landscape);
+                    if (ArtworkAssets.landscape(wide)) cached.landscape = wide;
+                    else if (landscape != null) incomplete = true;
+                    else if (cached.portrait != null) cached.landscape = null;
+                }
             }
-            ArtworkAssets.write(index,json(cached).put("checked",now).put("attempt",now).put("matching_version",MATCHING_VERSION).put("attempt_version",MATCHING_VERSION).put("match_state",status).put("match_id",matchedId));
+            ArtworkAssets.write(index,json(cached).put("checked",incomplete ? 0 : now).put("attempt",now).put("matching_version",MATCHING_VERSION).put("attempt_version",MATCHING_VERSION).put("match_state",status).put("match_id",matchedId));
         }catch(Exception ignored){try{old.put("attempt",now).put("attempt_version",MATCHING_VERSION).put("match_state","unavailable");ArtworkAssets.write(index,old);}catch(Exception unused){}}
         return withLegacy(c,p,cached);
+    }
+
+    private static File download(Catalog api,String path) {
+        if (path == null) return null;
+        try { return api.image(path); }
+        catch (Exception unavailable) { return null; }
     }
     private static boolean validPath(String path){return path!=null&&path.matches("/[A-Za-z0-9]+\\.(jpg|png|webp)");}
     /** Language-tagged landscape art is a title-bearing-cover signal; neutral backdrops are not title covers. */
@@ -154,7 +243,24 @@ final class TitleArtwork {
         return found;
     }
     static JSONObject match(JSONArray results,String title,String metadata){List<JSONObject> found=matches(results,title,metadata);return found.size()==1?found.get(0):null;}
-    private static JSONObject matchSeason(List<JSONObject> candidates,String metadata,Catalog api)throws Exception{
+    static JSONObject match(JSONArray results, String title, String metadata, MetadataLookup lookup) throws Exception {
+        return match(results, title, metadata, "", "", lookup);
+    }
+
+    static JSONObject match(JSONArray results, String title, String metadata, String mediaKind,
+                            String releaseDate, MetadataLookup lookup) throws Exception {
+        List<JSONObject> candidates = matches(results, title, metadata);
+        if (!mediaKind.isEmpty()) candidates.removeIf(row -> !mediaKind.equals(row.optString("media_type")));
+        if (candidates.size() > 1 && "movie".equals(mediaKind) && releaseDate.matches("[0-9]{4}(?:-.*)?")) {
+            String year = releaseDate.substring(0, 4);
+            List<JSONObject> matchingYear = new ArrayList<>();
+            for (JSONObject row : candidates) if (row.optString("release_date").startsWith(year)) matchingYear.add(row);
+            if (matchingYear.size() == 1) return matchingYear.get(0);
+        }
+        return candidates.size() == 1 ? candidates.get(0) : matchSeason(candidates, metadata, lookup);
+    }
+
+    private static JSONObject matchSeason(List<JSONObject> candidates,String metadata,MetadataLookup api)throws Exception{
         java.util.regex.Matcher season=java.util.regex.Pattern.compile("(?i)\\bseason\\s+(\\d+)\\b").matcher(metadata==null?"":metadata);
         if(candidates.size()<2||candidates.size()>4||!season.find())return null;
         int minimum;try{minimum=Integer.parseInt(season.group(1));}catch(NumberFormatException e){return null;}if(minimum<2||minimum>100)return null;

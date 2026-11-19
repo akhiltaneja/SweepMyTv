@@ -17,8 +17,8 @@ public class HomeInsightsTest {
         HomeInsights.Air air=HomeInsights.parseAir(new JSONObject("{\"timezone\":\"Asia/Kolkata\",\"current\":{\"us_aqi\":185,\"pm2_5\":73.6,\"time\":\"2026-11-03T13:30\"}}"),ZoneId.of("UTC"));
         assertEquals(185,air.aqi);assertEquals("Unhealthy",air.label());assertEquals(NOW,air.at);assertTrue(air.valid(NOW));assertFalse(air.valid(NOW+13*HomeInsights.HOUR));assertFalse(air.valid(NOW-HomeInsights.HOUR));
         for(String invalid:new String[]{"null","-1","2000"})try{HomeInsights.parseAir(new JSONObject("{\"current\":{\"us_aqi\":"+invalid+",\"time\":\"2026-11-03T13:30\"}}"),ZoneId.of("UTC"));fail();}catch(Exception expected){}
-        HomeInsights.State state=new HomeInsights.State();state.place=delhi();state.air=air;Channels.Channel row=state.row(RuntimeEnvironment.getApplication(),NOW);HomeInsights.Card card=(HomeInsights.Card)row.items.get(0).extra;
-        assertTrue(card.foot.contains("US AQI"));assertTrue(card.foot.contains("estimate"));assertTrue(card.detail.contains("not an AQI.in station"));assertTrue(card.detail.contains("73.6"));
+        HomeInsights.State state=new HomeInsights.State();state.place=new HomeInsights.Place("Mumbai","IN","Maharashtra","Asia/Kolkata",19.07,72.87,false);state.air=air;Channels.Channel row=state.row(RuntimeEnvironment.getApplication(),NOW);HomeInsights.Card card=(HomeInsights.Card)row.items.get(0).extra;
+        assertEquals("US AQI estimate",card.foot);assertTrue(card.detail.contains("not an AQI.in station"));assertTrue(card.detail.contains("73.6"));
     }
     @Test public void rssUsesRealDatesSafePublisherLinksAndUsRelevantTopics()throws Exception{
         String xml="<rss><channel>"+item("OpenAI announces a new AI model","https://www.wsj.com/tech/ai/one","Tue, 03 Nov 2026 07:00:00 GMT")+item("Local India festival celebration","https://www.wsj.com/two","Tue, 03 Nov 2026 07:00:00 GMT")+item("Apple launches a new chip","https://evil.example/story","Tue, 03 Nov 2026 07:00:00 GMT")+item("Microsoft future headline","https://www.wsj.com/next","Wed, 04 Nov 2026 07:00:00 GMT")+item("Apple old headline","https://www.wsj.com/old","Tue, 03 Oct 2026 07:00:00 GMT")+"</channel></rss>";
@@ -44,6 +44,20 @@ public class HomeInsightsTest {
         Channels.Channel row=state.row(c,NOW);assertEquals(3,row.items.size());assertEquals("news",((HomeInsights.Card)row.items.get(1).extra).kind);assertEquals(1,((HomeInsights.Card)row.items.get(1).extra).stories.size());assertTrue(((HomeInsights.Card)row.items.get(2).extra).foot.contains("5 days"));
         HomeOptions.prefs(c).edit().putBoolean("insight_air",false).putBoolean("insight_source_wsj",false).apply();row=state.row(c,NOW);assertEquals(2,row.items.size());assertTrue(((HomeInsights.Card)row.items.get(0).extra).stories.isEmpty());
     }
+    @Test public void reEnablingNewsAfterHidingAllWidgetsLeavesAqiAndCalendarOff() {
+        Context context = RuntimeEnvironment.getApplication();
+        HomeOptions.prefs(context).edit().putBoolean("insights", false).apply();
+        SectionOptions.set(context, HomeInsights.KEY, false);
+        assertFalse(HomeInsights.Widget.NEWS.enabled(context));
+        HomeInsights.Widget.NEWS.setEnabled(context, true);
+        assertTrue(HomeInsights.Widget.NEWS.enabled(context));
+        assertFalse(HomeInsights.Widget.AIR.enabled(context));
+        assertFalse(HomeInsights.Widget.CALENDAR.enabled(context));
+        assertFalse(SectionOptions.hidden(context, HomeInsights.KEY));
+        Channels.Channel row = HomeInsights.State.empty().row(context, NOW);
+        assertEquals(1, row.items.size());
+        assertEquals("news", ((HomeInsights.Card) row.items.get(0).extra).kind);
+    }
     @Test public void duplicateHeadlinesAndStaleOrFutureStoriesCannotFillTheNewsCard(){
         List<HomeInsights.Story> input=new ArrayList<>();input.add(new HomeInsights.Story("Apple releases a chip","https://www.wsj.com/a","WSJ Tech","Tech",NOW));input.add(new HomeInsights.Story("Apple releases a chip!","https://www.cnbc.com/a","CNBC Tech","Tech",NOW-100));input.add(new HomeInsights.Story("Microsoft future","https://www.wsj.com/b","WSJ Tech","Tech",NOW+HomeInsights.HOUR));
         assertEquals(1,HomeInsights.mergeStories(input,NOW).size());
@@ -54,8 +68,8 @@ public class HomeInsightsTest {
         assertNull(ApproximateCity.parse(reply.put("is_bogon",true),ZoneId.of("Asia/Kolkata"),NOW));
     }
     @Test public void snapshotUpdatesWhenHeadlineSourceOrAqiChanges(){
-        Context c=RuntimeEnvironment.getApplication();HomeInsights.State state=new HomeInsights.State();state.place=delhi();state.air=new HomeInsights.Air(80,30,NOW);state.stories.add(new HomeInsights.Story("Apple launches a chip","https://www.wsj.com/a","WSJ Tech","Tech",NOW));String before=new ChannelSnapshot(List.of(state.row(c,NOW))).signature;
-        state.air=new HomeInsights.Air(180,70,NOW);assertNotEquals(before,new ChannelSnapshot(List.of(state.row(c,NOW))).signature);
+        Context c=RuntimeEnvironment.getApplication();HomeInsights.State state=new HomeInsights.State();state.place=delhi();state.air=new HomeInsights.Air(80,30,NOW,true,55);state.stories.add(new HomeInsights.Story("Apple launches a chip","https://www.wsj.com/a","WSJ Tech","Tech",NOW));String before=new ChannelSnapshot(List.of(state.row(c,NOW))).signature;
+        state.air=new HomeInsights.Air(180,70,NOW,true,55);assertNotEquals(before,new ChannelSnapshot(List.of(state.row(c,NOW))).signature);
     }
     @Test public void mixedFeedsCannotTreatPronounUsOrGeneralPoliticsAsTech()throws Exception{
         String xml="<rss><channel>"+item("Live Q&amp;A: Ask Us Your Questions About the Midterm-Elections Results","https://www.wsj.com/politics","Tue, 03 Nov 2026 07:00:00 GMT")+item("US Senate election results announced","https://www.wsj.com/election","Tue, 03 Nov 2026 07:00:00 GMT")+item("Apple launches a new chip","https://www.wsj.com/chip","Tue, 03 Nov 2026 07:00:00 GMT")+"</channel></rss>";
@@ -67,4 +81,33 @@ public class HomeInsightsTest {
     private static HomeInsights.Place delhi(){return new HomeInsights.Place("Delhi","IN","Delhi","Asia/Kolkata",28.61,77.21,false);}
     private static String item(String title,String url,String date){return "<item><title>"+title+"</title><link>"+url+"</link><pubDate>"+date+"</pubDate></item>";}
     private static String event(String title,String date,String location){return "BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:"+date+"\r\nSUMMARY:"+title+"\r\nLOCATION:"+location+"\r\nURL:https://www.officeholidays.com/holidays/india/example\r\nEND:VEVENT\r\n";}
+
+    @Test public void delhiShowsThePublishedNationalScaleAndRejectsStaleOrMissingReadings() throws Exception {
+        assertTrue(HomeInsights.delhiAqiUrl(NOW).endsWith("?at=2026-11-03T13%3A29%3A00"));
+        JSONObject city=new JSONObject().put("current_aqi",185).put("reporting_stations",55);
+        JSONObject data=new JSONObject().put("delhi",city).put("last_updated",Instant.ofEpochMilli(NOW).toString());
+        JSONObject response=new JSONObject().put("success",true).put("data",data);
+        HomeInsights.Air air=HomeInsights.parseDelhiAqi(response,NOW);
+        assertEquals("Moderate",air.label());
+        assertTrue(HomeInsights.Air.parse(air.json()).official);
+        assertEquals(55,air.stations);
+        HomeInsights.State state=HomeInsights.State.empty();
+        state.place=delhi();
+        state.air=air;
+        Context ctx=RuntimeEnvironment.getApplication();
+        HomeInsights.Card fresh=(HomeInsights.Card)state.row(ctx,NOW).items.get(0).extra;
+        assertEquals("185",fresh.metric);
+        assertEquals("Moderate",fresh.body);
+        assertEquals("",fresh.foot);
+        state.airError="Delhi government readings temporarily unavailable";
+        HomeInsights.Card cached=(HomeInsights.Card)state.row(ctx,NOW).items.get(0).extra;
+        assertEquals("185",cached.metric);
+        assertEquals("Last available",cached.foot);
+        try { HomeInsights.parseDelhiAqi(response,NOW+13*HomeInsights.HOUR); fail(); }
+        catch (java.io.IOException expected) { }
+        city.put("reporting_stations",0);
+        try { HomeInsights.parseDelhiAqi(response,NOW); fail(); }
+        catch (java.io.IOException expected) { }
+        assertTrue(HomeInsights.usesDelhiAqi(delhi()));
+    }
 }

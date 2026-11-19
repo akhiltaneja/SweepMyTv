@@ -28,7 +28,7 @@ public class DisplayOptionsTest {
     }
     @Test public void timeBackgroundIgnoresAppGlowUntilSwitchedBack() {
         Context app=RuntimeEnvironment.getApplication();Backdrop view=new Backdrop(app,null);view.layout(0,0,960,540);
-        view.setTheme(false,0xFF121419,0xFF08090C,0,0,0,.3f);int[] colors=TimeOfDay.colors(720);
+        view.setTheme(false,0xFF121419,0xFF08090C,0,0,0,.3f,false);int[] colors=TimeOfDay.colors(720);
         view.setTimeColors(colors[0],colors[1]);view.setGlow(0xFFFF0000);
         org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(600));
         Bitmap first=Bitmap.createBitmap(960,540,Bitmap.Config.ARGB_8888);view.draw(new android.graphics.Canvas(first));
@@ -39,10 +39,12 @@ public class DisplayOptionsTest {
         second.eraseColor(0);view.draw(new android.graphics.Canvas(second));assertNotEquals(first.getPixel(350,250),second.getPixel(350,250));
     }
     @Test public void youtubeChoiceIsReversibleAndLimitedToYoutubePackages() {
-        Context c=RuntimeEnvironment.getApplication();assertTrue(ContinueOptions.youtube(c));
-        c.getSharedPreferences("home",0).edit().putBoolean(ContinueOptions.YOUTUBE,false).commit();
+        Context c=RuntimeEnvironment.getApplication();assertFalse(ContinueOptions.youtube(c));
         for(String p:new String[]{"com.google.android.youtube.tv","com.google.android.youtube","com.amazon.firetv.youtube"})assertFalse(ContinueOptions.include(c,p));
-        assertTrue(ContinueOptions.include(c,"com.netflix.ninja"));
+        for (String pkg : new String[]{"com.netflix.ninja", "in.startv.hotstar",
+                "com.amazon.amazonvideo.livingroom", "com.apple.atve.androidtv.appletv"}) {
+            assertTrue(ContinueOptions.include(c, pkg));
+        }
         c.getSharedPreferences("home",0).edit().putBoolean(ContinueOptions.YOUTUBE,true).commit();
         assertTrue(ContinueOptions.include(c,"com.google.android.youtube.tv"));
     }

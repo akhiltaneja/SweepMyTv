@@ -29,14 +29,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Talkies settings → Keys and location → Send from your phone: the page a phone opens from the QR code, to paste the
- * TMDB key, the CricketData key and the weather area instead of typing them with the remote. Its address is
+ * The page a phone opens from the QR code to enter a TMDB key instead of using the remote. Its address is
  * http://(the TV's address on the home network):(a free port)/(a one-time random token). It takes one form (one
  * POST), has the TV check each key with its service, answers with the result and stops; after 5 minutes it stops
  * anyway. Plain HTTP, since a phone can't check a certificate for a LAN address; it listens only on that address, and
  * nothing sent is logged. Adapted from Free My TV's KeyPage (MIT).
  *
- * Its other job (Talkies settings → Wallpaper → From your phone): a page to pick a photo, which the phone itself crops
+ * It also serves the phone dashboard's photo picker. The phone crops the selected photo
  * to the TV's 16:9 and re-encodes as a 1920 × 1080 JPEG (so it arrives small, without the photo's location or other
  * details), then sends as the one POST.
  */
@@ -47,12 +46,13 @@ final class PhonePage {
     interface Listener {
         /** A phone sent the form: the TV checks it now. */
         void checking();
-        /** Checks and saves what was filled in ("tmdb", "cricket", "location"; empty ones left out): a line for each. */
+        /** Checks and saves the submitted TMDB key. */
         List<String> accept(Map<String, String> fields);
         /** The page stopped: after the form, after 5 minutes (expired) or close(). Called once. */
         void closed(boolean expired);
         /** The wallpaper page's photo, a JPEG: saves it and says how it went. */
         default List<String> acceptWallpaper(byte[] jpeg) { return null; }
+        default List<String> acceptDashboard(Map<HomeDashboard.Option, Boolean> settings) { return null; }
     }
 
     static final long OPEN_FOR = 5 * 60_000L;
@@ -63,6 +63,7 @@ final class PhonePage {
     final String url;
     /** The wallpaper page rather than the keys page. */
     private final boolean wallpaper;
+    private final HomeDashboard dashboard;
     private final ServerSocket server;
     private final String path;
     private final Listener listener;
@@ -70,7 +71,9 @@ final class PhonePage {
     private final AtomicInteger answering = new AtomicInteger();
     private volatile boolean closed;
 
-    PhonePage(InetAddress lan, Listener listener) throws IOException { this(lan, false, listener); }
+    PhonePage(InetAddress lan, Listener listener) throws IOException {
+        this(lan, false, "", 1920, 1080, null, listener);
+    }
 
     /** What the photo is cropped for, on the photo page: "the TV screen", or an app's tile. */
     private final String fitFor;
@@ -78,7 +81,17 @@ final class PhonePage {
 
     PhonePage(InetAddress lan, boolean wallpaper, String fitFor, Listener listener) throws IOException {this(lan,wallpaper,fitFor,1920,1080,listener);}
     PhonePage(InetAddress lan, boolean wallpaper, Listener listener) throws IOException {this(lan,wallpaper,"the TV screen",1920,1080,listener);}
+    PhonePage(InetAddress lan, HomeDashboard dashboard, Listener listener) throws IOException {
+        this(lan, false, "the TV screen", 1920, 1080, dashboard, listener);
+    }
+
     PhonePage(InetAddress lan, boolean wallpaper, String fitFor,int width,int height, Listener listener) throws IOException {
+        this(lan, wallpaper, fitFor, width, height, null, listener);
+    }
+
+    private PhonePage(InetAddress lan, boolean wallpaper, String fitFor, int width, int height,
+                      HomeDashboard dashboard, Listener listener) throws IOException {
+        this.dashboard = dashboard;
         this.listener=listener;this.wallpaper=wallpaper;this.fitFor=fitFor;this.cropWidth=width;this.cropHeight=height;
         byte[] random = new byte[12];
         new SecureRandom().nextBytes(random);
@@ -187,12 +200,15 @@ final class PhonePage {
         String method = line.length > 1 ? line[0] : "", target = line.length > 1 ? line[1] : "";
         int query = target.indexOf('?');
         if (query >= 0) target = target.substring(0, query);
-        if (!target.equals(path)) {
+        boolean dashboardPhoto = dashboard != null && target.equals(path + "/wallpaper");
+        boolean photo = wallpaper || dashboardPhoto;
+        if (!target.equals(path) && !dashboardPhoto) {
             respond(out, "404 Not Found", "text/plain; charset=utf-8", "Not found".getBytes(StandardCharsets.UTF_8));
             return false;
         }
         if (method.equals("GET") || method.equals("HEAD")) {
-            respond(out, "200 OK", "text/html; charset=utf-8", method.equals("HEAD") ? new byte[0] : wallpaper ? photoForm() : form());
+            byte[] body = method.equals("HEAD") ? new byte[0] : dashboardPhoto ? photoForm() : page();
+            respond(out, "200 OK", "text/html; charset=utf-8", body);
             return false;
         }
         if (!method.equals("POST")) {
@@ -200,7 +216,7 @@ final class PhonePage {
             return false;
         }
         int length = contentLength(head);
-        if (length < 0 || length > (wallpaper ? MAX_IMAGE : MAX_BODY)) {
+        if (length < 0 || length > (photo ? MAX_IMAGE : MAX_BODY)) {
             respond(out, "413 Payload Too Large", "text/plain; charset=utf-8", new byte[0]);
             return false;
         }
@@ -211,9 +227,16 @@ final class PhonePage {
             n += got;
         }
         // The wallpaper page sends what the phone's own browser made: a JPEG, or nothing worth keeping.
-        if (wallpaper && (length < 3 || (body[0] & 0xFF) != 0xFF || (body[1] & 0xFF) != 0xD8 || (body[2] & 0xFF) != 0xFF)) {
+        if (photo && (length < 3 || (body[0] & 0xFF) != 0xFF || (body[1] & 0xFF) != 0xD8 || (body[2] & 0xFF) != 0xFF)) {
             respond(out, "415 Unsupported Media Type", "text/html; charset=utf-8",
                     result(java.util.Collections.singletonList("That didn't arrive as a picture."), false));
+            return false;
+        }
+        Map<HomeDashboard.Option, Boolean> settings = dashboard == null || dashboardPhoto ? null
+                : HomeDashboard.parse(new String(body, StandardCharsets.US_ASCII));
+        if (dashboard != null && !dashboardPhoto && settings == null) {
+            respond(out, "400 Bad Request", "text/plain; charset=utf-8",
+                    "Invalid settings. Go back and use the dashboard form.".getBytes(StandardCharsets.UTF_8));
             return false;
         }
         // Stopped meanwhile (the dialog closed, 5 minutes), or two at once: only the first, while it shows, counts.
@@ -221,17 +244,21 @@ final class PhonePage {
             respond(out, "409 Conflict", "text/html; charset=utf-8", result(null));
             return false;
         }
-        if (wallpaper) {
+        if (photo) {
             listener.checking();
-            respond(out, "200 OK", "text/html; charset=utf-8", result(listener.acceptWallpaper(body)));
+            List<String> saved = listener.acceptWallpaper(body);
+            respond(out, saved == null ? "409 Conflict" : "200 OK", "text/html; charset=utf-8", result(saved));
+            return true;
+        }
+        if (dashboard != null) {
+            List<String> saved = listener.acceptDashboard(settings);
+            respond(out, saved == null ? "409 Conflict" : "200 OK", "text/html; charset=utf-8", result(saved));
             return true;
         }
         String form = new String(body, StandardCharsets.US_ASCII);
         Map<String, String> fields = new LinkedHashMap<>();
-        for (String name : new String[]{"tmdb", "cricket", "location"}) {
-            String v = field(form, name).trim();
-            if (!v.isEmpty()) fields.put(name, v);
-        }
+        String value = field(form, "tmdb").trim();
+        if (BuildConfig.CATALOG_COMPARISON && !value.isEmpty()) fields.put("tmdb", value);
         listener.checking();
         respond(out, "200 OK", "text/html; charset=utf-8", result(fields.isEmpty()
                 ? java.util.Collections.singletonList("Nothing was filled in, so nothing changed.") : listener.accept(fields)));
@@ -282,7 +309,7 @@ final class PhonePage {
 
     private static void respond(OutputStream out, String status, String type, byte[] body) throws IOException {
         String head = "HTTP/1.1 " + status + "\r\nContent-Type: " + type + "\r\nContent-Length: " + body.length
-                + "\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff"
+                + "\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\nX-Frame-Options: DENY"
                 + "\r\nConnection: close\r\n\r\n";
         out.write(head.getBytes(StandardCharsets.ISO_8859_1));
         out.write(body);
@@ -291,18 +318,18 @@ final class PhonePage {
 
     // ---------------------------------------------------------------- the pages
 
-    /** Three fields, each optional: fill in what you have. */
+    private byte[] page() {
+        if (dashboard != null) return dashboard.form(path);
+        return wallpaper ? photoForm() : form();
+    }
+
     private byte[] form() {
         StringBuilder b = top();
-        b.append("<p>Fill in what you have; an empty box leaves that setting as it is.</p>")
-                .append("<form method=post action=\"").append(path).append("\">")
-                .append(box("tmdb", "TMDB key", "For the Trending and New picks. Free at "
+        b.append("<form method=post action=\"").append(path).append("\">");
+        if (BuildConfig.CATALOG_COMPARISON) b.append(box("tmdb", "TMDB key", "Optional. Adds catalog recommendations and artwork. Get a key at "
                         + "<a href=\"https://www.themoviedb.org/settings/api\" target=_blank rel=noreferrer>themoviedb.org → Settings → API</a>: "
-                        + "the API Key or the API Read Access Token.", true))
-                .append(box("cricket", "CricketData key", "For live cricket scores. Free at "
-                        + "<a href=\"https://cricketdata.org\" target=_blank rel=noreferrer>cricketdata.org</a>.", true))
-                .append(box("location", "Weather location", "A town or area, like “Camden, London”, or latitude,longitude.", false))
-                .append("<button>Send to the TV</button></form><p class=s>")
+                        + "the API Key or the API Read Access Token.", true));
+        b.append("<button>Send to the TV</button></form><p class=s>")
                 .append("It all stays on your TV. This page works once, for 5 minutes.</p>");
         return bottom(b);
     }
@@ -313,6 +340,7 @@ final class PhonePage {
      */
     private byte[] photoForm() {
         StringBuilder b = top();
+        if (dashboard != null) b.append("<p><a href=\"").append(path).append("\">Back to Customize Home</a></p>");
         b.append("<p>Choose a photo. It's cropped to fit ").append(esc(fitFor)).append(" here on your phone, then sent to the TV.</p>")
                 .append("<input type=file id=f accept=\"image/*\">")
                 .append("<img id=p alt=\"\" style=\"display:none;width:100%;margin-top:16px;border-radius:10px\">")
@@ -348,7 +376,7 @@ final class PhonePage {
     private byte[] result(List<String> lines, boolean done) {
         StringBuilder b = top();
         if (lines == null) {
-            b.append("<p class=no>This code has expired. On the TV, open Send from your phone again.</p>");
+            b.append("<p class=no>This code has expired. Open the phone setup page again on your TV.</p>");
         } else {
             for (String l : lines) b.append("<p>").append(esc(l)).append("</p>");
             b.append(done ? "<p class=s>You can close this page.</p>"

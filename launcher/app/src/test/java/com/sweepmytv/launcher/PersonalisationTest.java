@@ -13,24 +13,57 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=29)
 public class PersonalisationTest {
+    @Test public void sweepUpdateCheckComparesPublishedPreviewsNumerically() throws Exception {
+        org.json.JSONArray releases = new org.json.JSONArray();
+        for (String version : new String[]{"v1.3.0-sweep.25", "v1.3.0-sweep.100", "v1.3.0-sweep.9", "v3.5.0"}) {
+            releases.put(new JSONObject().put("draft", false).put("prerelease", true)
+                    .put("published_at", "2026-11-16T00:00:00Z").put("tag_name", version));
+        }
+        releases.put(new JSONObject().put("draft", true).put("tag_name", "v1.3.0-sweep.999"));
+        assertEquals("Update available · 1.3.0-sweep.100", SelfUpdate.releaseStatus("1.3.0-sweep.99", releases));
+        assertEquals("Up to date · 1.3.0-sweep.100", SelfUpdate.releaseStatus("1.3.0-sweep.100", releases));
+        assertTrue(SelfUpdate.releaseStatus("1.3.0-sweep.101", releases).startsWith("Installed build is newer"));
+        assertEquals("No Sweep TV releases published", SelfUpdate.releaseStatus("1.3.0-sweep.101", new org.json.JSONArray()));
+    }
+
     @Test public void greetingIsOptionalAndNamesStayLocalAndEditable() {
         Context app=RuntimeEnvironment.getApplication();assertTrue(Keys.write(app,HomeOptions.NAME,"Akhil"));
         assertEquals("Good afternoon, Akhil",HomeOptions.greeting(15,HomeOptions.name(app)));
         assertEquals("Good morning",HomeOptions.greeting(8,""));assertEquals("Good evening, Akhil",HomeOptions.greeting(20,"Akhil"));
-        long now=System.currentTimeMillis();assertTrue(HomeOptions.header(app,now,"29° Sunny").contains("Akhil"));
-        HomeOptions.prefs(app).edit().putBoolean("header_greeting",false).commit();assertEquals("29° Sunny",HomeOptions.header(app,now,"29° Sunny"));
-        HomeOptions.prefs(app).edit().putBoolean("header_weather",false).commit();assertEquals("",HomeOptions.header(app,now,"29° Sunny"));
+        long now=System.currentTimeMillis();assertTrue(HomeOptions.header(app,now).contains("Akhil"));
+        HomeOptions.prefs(app).edit().putBoolean(HomeOptions.GREETING,false).commit();
+        assertEquals("",HomeOptions.header(app,now));
         assertTrue(Keys.write(app,HomeOptions.NAME,""));assertEquals("",HomeOptions.name(app));
     }
-    @Test public void metricsCanAllBeRemovedIndependentlyAndStaleCodexIsLabelled() throws Exception {
-        Context app=RuntimeEnvironment.getApplication();Meters widget=new Meters(app,null);widget.update();assertTrue(widget.content().contains("RAM"));assertTrue(widget.content().contains("Disk"));
-        HomeOptions.stat(app,"ram",false);widget.update();assertFalse(widget.content().contains("RAM"));assertTrue(widget.content().contains("Disk"));
-        HomeOptions.stat(app,"storage",false);widget.update();assertEquals(View.GONE,widget.getVisibility());
-        long now=System.currentTimeMillis();JSONObject snapshot=new JSONObject().put("synced_at",now).put("used_percent",53).put("window_minutes",10080).put("resets_at",now+3600_000);
-        CodexUsage usage=CodexUsage.parse(snapshot,now);assertNotNull(usage);assertEquals("week 47% left",usage.compact(now));assertEquals("Sync needed",usage.compact(now+16*60_000));
-        assertTrue(Keys.write(app,CodexUsage.FILE,snapshot.toString()));HomeOptions.stat(app,"codex",true);widget.update();assertEquals(View.VISIBLE,widget.getVisibility());assertTrue(widget.content().contains("47% left"));
-        HomeOptions.prefs(app).edit().putBoolean("meters",false).commit();widget.update();assertEquals(View.GONE,widget.getVisibility());
-        assertNull(CodexUsage.parse(snapshot.put("used_percent",-1),now));
+    @Test public void statusMetricsCanBeHiddenAndOldCodexDataIsIgnored() {
+        Context app = RuntimeEnvironment.getApplication();
+        var prefs = HomeOptions.prefs(app);
+        Meters widget = new Meters(app, null);
+        prefs.edit().putBoolean(HomeOptions.Metric.UPTIME.key, true).apply();
+        widget.update();
+        widget.measure(0, 0);
+        int fullWidth = widget.getMeasuredWidth();
+        assertTrue(widget.content().contains("RAM"));
+        assertTrue(widget.content().contains("GB free"));
+
+        prefs.edit().putBoolean(HomeOptions.Metric.RAM.key, false).apply();
+        widget.update();
+        widget.measure(0, 0);
+        assertFalse(widget.content().contains("RAM"));
+        assertTrue(widget.getMeasuredWidth() < fullWidth);
+        assertTrue(widget.content().contains("Storage"));
+
+        prefs.edit().putBoolean("meters", false).putBoolean("widget_codex", true).apply();
+        HomeOptions.migrateDeviceMetrics(prefs);
+        widget.update();
+        assertEquals(View.GONE, widget.getVisibility());
+        assertTrue(Keys.write(app, "codex_usage.json", "{}"));
+        prefs.edit().putBoolean(HomeOptions.Metric.UPTIME.key, true).apply();
+        HomeOptions.migrateDeviceMetrics(prefs);
+        widget.update();
+        assertEquals(View.VISIBLE, widget.getVisibility());
+        assertTrue(widget.content().startsWith("Uptime"));
+        assertFalse(widget.content().contains("Storage"));
     }
     @Test public void hidingWholeSectionsPreservesTheirItemsAndCanBeReversed() {
         Context app=RuntimeEnvironment.getApplication();Channels.Channel row=new Channels.Channel();row.key="example.channel";row.title="My section";Trending.Pick pick=new Trending.Pick();pick.title="Film";pick.intentUri="example://resume";row.items.add(pick);
@@ -46,7 +79,7 @@ public class PersonalisationTest {
         assertFalse(SelfUpdate.takesReleases(app));assertFalse(SelfUpdate.checkIfStale(app));assertNull(SelfUpdate.available(app));
         assertFalse(SelfUpdate.summary(app).contains("Up to date"));
         assertFalse(ReleaseInfo.notes(app).get(0).contains("unavailable"));assertFalse(ReleaseInfo.notes(app).isEmpty());
-        assertTrue(ReleaseInfo.components(app).get(0).name.contains("v3.4.0"));
+        assertTrue(ReleaseInfo.components(app).get(0).name.contains("v3.5.0"));
         assertTrue(ReleaseInfo.components(app).get(0).detail.contains("not a wholesale import"));
         installed.versionName="0.0.0";org.robolectric.Shadows.shadowOf(app.getPackageManager()).installPackage(installed);
         assertTrue(ReleaseInfo.components(app).isEmpty());assertTrue(ReleaseInfo.notes(app).get(0).contains("unavailable"));

@@ -13,6 +13,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -32,20 +33,19 @@ import java.util.List;
  * Also types a match into JioHotstar's search when a Cricket card has no direct link: JioHotstar's search
  * links open an empty search page. It only acts for 30 s after you pick a card and looks for nothing but the search box.
  *
- * And keeps Talkies as the home screen while the TV's own launcher stays enabled (on Google TV the Assistant needs
+ * And keeps Sweep TV as the home screen while the TV's own launcher stays enabled (on Google TV the Assistant needs
  * it: results such as "show me action movies" open on its home screen), though Android may send Home to it. So the
- * Home key opens Talkies, and so does the built-in launcher's home screen appearing on its own (after a restart,
+ * Home key opens Sweep TV, and so does the built-in launcher's home screen appearing on its own (after a restart,
  * or backing out of its pages), except within a few seconds of the Assistant, when it is showing results. The
  * built-in launchers are found at start: system apps that can be the home screen (launchers you installed, like
  * Projectivy, are left alone). The approach follows Matinee's HomeKeyService (MIT). Events come only from JioHotstar,
  * those launchers and the Assistant.
  *
  * Keys: it filters Home (above), OK while the sleep warning is up ("15 more minutes"), and remote buttons you've
- * given a job in Talkies settings → Remote keys (RemoteKeys); every other key passes through untouched. A button with a
+ * given a job in Sweep TV settings → Remote keys (RemoteKeys); every other key passes through untouched. A button with a
  * hold job does it when held for HOLD_MS, and its press job when let go sooner.
  *
- * With "Home at power-on: Always" set, Talkies also comes up each time the TV wakes from standby, unless you press a
- * button first (an idea from CleanYourTV's power_on_home_always, MIT).
+ * Sweep TV also returns after standby while it handles Home (adapted from CleanYourTV, MIT).
  * The sleep warning is a small card drawn as an accessibility overlay, so no "display over other apps" permission.
  * You switch it on yourself in Settings → Device Preferences → Accessibility; if a force stop switches it off,
  * ServiceRepair can put it back (see there).
@@ -58,6 +58,7 @@ public class SleepService extends AccessibilityService {
     private static String pendingSearch;
     private static long pendingUntil;
     private static final String ASSISTANT = "com.google.android.katniss";
+    private static final String PATCHWALL = "com.mitv.tvhome.atv";
     /** The built-in launchers' home screens (package/class), found at start. */
     private final java.util.Set<String> stockHomes = new java.util.HashSet<>();
     private final java.util.Set<String> stockPackages = new java.util.HashSet<>();
@@ -67,9 +68,14 @@ public class SleepService extends AccessibilityService {
     /** The held button's hold job, waiting for HOLD_MS; null once it ran or the button came up. */
     private Runnable holding;
     private boolean held;
-    /** Home held for HOLD_MS: Google TV's dashboard (Android's notification panel), as Home does without Talkies. */
+    /** Home held for HOLD_MS: Google TV's dashboard (Android's notification panel), as Home does without Sweep TV. */
     private final Runnable homeHold = () -> { homeHeld = true; performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS); };
     private boolean homeHeld;
+    private final HomeDoublePress homeDoublePress = new HomeDoublePress();
+    private final Runnable singleHome = () -> {
+        homeDoublePress.clear();
+        if (!otherLauncherChosen()) launchHome();
+    };
     private BroadcastReceiver screenOn;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final VolumeRepeater volume=new VolumeRepeater(main,direction->{
@@ -78,10 +84,15 @@ public class SleepService extends AccessibilityService {
     });
 
     /** Remote keys: the next button pressed is reported here instead of doing anything (null when not learning). */
-    interface KeyListener { void onKey(int keyCode); }
+    interface KeyListener { void onKey(int keyCode, String device); }
     private static KeyListener learning;
 
     static boolean isRunning() { return running != null; }
+
+    static boolean handlesHome(android.content.pm.ResolveInfo androidHome) {
+        SleepService service = running;
+        return service != null && !service.otherLauncherChosen(androidHome);
+    }
 
     static boolean lock() {
         return Sleep.SUPPORTED && running != null && running.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN);
@@ -90,11 +101,6 @@ public class SleepService extends AccessibilityService {
     /** The TV's own power menu (Restart, and Power off on most TVs); it asks before it acts. */
     static boolean powerMenu() {
         return running != null && running.performGlobalAction(GLOBAL_ACTION_POWER_DIALOG);
-    }
-
-    /** Talkies settings → Home at power-on: "boot" (after a restart only) or "always" (every wake from standby). */
-    static boolean homeOnWake(Context c) {
-        return "always".equals(c.getSharedPreferences("home", MODE_PRIVATE).getString("home_at_power_on", "boot"));
     }
 
     /** Types {@code text} into JioHotstar's search box once it shows up. False if the service is off. */
@@ -111,23 +117,28 @@ public class SleepService extends AccessibilityService {
         ServiceRepair.connected(this, SleepService.class);
         // After a restart the Google TV home screen is up before this service binds: take over once.
         if (SystemClock.elapsedRealtime() < BOOT_WINDOW_MS) openHome();
-        // After Talkies updates itself (or the service comes back for any other reason), Android shows the built-in
-        // launcher while this service is unbound, so the window event that would bring Talkies back is missed: if
+        // After Sweep TV updates itself (or the service comes back for any other reason), Android shows the built-in
+        // launcher while this service is unbound, so the window event that would bring Sweep TV back is missed: if
         // that launcher is what's in front now, take over once.
         main.postDelayed(() -> {
             AccessibilityNodeInfo root = getRootInActiveWindow();
             if (root != null && root.getPackageName() != null && stockPackages.contains(root.getPackageName().toString())) openHome();
         }, 500);
-        // Waking from standby isn't a restart: the TV may bring back the last input or app. Registered always, so
-        // the setting works without restarting the service; the TV keeps this process up while the service runs.
+        // Xiaomi and other TVs may restore the last input or app before Sweep TV opens.
         if (screenOn == null) {
             screenOn = new BroadcastReceiver() {
                 @Override public void onReceive(Context c, Intent i) {
-                    if(Intent.ACTION_SCREEN_OFF.equals(i.getAction())){volume.stop();return;}
-                    if (!homeOnWake(c)) return;
+                    if (Intent.ACTION_SCREEN_OFF.equals(i.getAction())) {
+                        volume.stop();
+                        cancelHomeGesture();
+                        return;
+                    }
                     long on = SystemClock.elapsedRealtime();
-                    // After the TV has put its last source back; not if you've already pressed a button.
-                    main.postDelayed(() -> { if (keyAt < on) openHome(); }, WAKE_DELAY_MS);
+                    main.postDelayed(() -> {
+                        PowerManager power = getSystemService(PowerManager.class);
+                        if (screenOn != null && power != null && power.isInteractive()
+                                && keyAt < on && !otherLauncherChosen()) openHome();
+                    }, WAKE_DELAY_MS);
                 }
             };
             IntentFilter screens=new IntentFilter(Intent.ACTION_SCREEN_ON);screens.addAction(Intent.ACTION_SCREEN_OFF);registerReceiver(screenOn,screens);
@@ -137,7 +148,9 @@ public class SleepService extends AccessibilityService {
     @Override protected boolean onKeyEvent(KeyEvent event) {
         int code = event.getKeyCode();
         boolean up = event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled();
-        keyAt = SystemClock.elapsedRealtime();
+        if (code != KeyEvent.KEYCODE_POWER && code != KeyEvent.KEYCODE_TV_POWER && code != KeyEvent.KEYCODE_WAKEUP) {
+            keyAt = SystemClock.elapsedRealtime();
+        }
         if((code==KeyEvent.KEYCODE_VOLUME_UP||code==KeyEvent.KEYCODE_VOLUME_DOWN)
                 &&(event.getRepeatCount()==0||event.getAction()==KeyEvent.ACTION_UP))
             Log.i(TAG,"Volume input code="+code+" action="+event.getAction()+" scan="+event.getScanCode()
@@ -148,29 +161,40 @@ public class SleepService extends AccessibilityService {
         } else volume.stop();
         if (code == KeyEvent.KEYCODE_HOME) {
             // You chose a launcher you installed yourself (Projectivy…) as the home app: Home is its, not ours.
-            if (otherLauncherChosen()) return false;
+            if (otherLauncherChosen()) {
+                cancelHomeGesture();
+                return false;
+            }
             // Android's own Home also switches the TV to this device's input over HDMI-CEC (One Touch Play), which an
-            // app can't do: let it through where that matters. With Talkies the default home app, Android opens
-            // Talkies itself; on a streaming box, it opens Google TV's home and the window watcher below brings
-            // Talkies back over it. Only a TV with another default home has Home caught here.
-            if (talkiesIsDefaultHome() || streamingBox()) return false;
-            // Pressed: Talkies. Held: the dashboard, which catching Home would otherwise take away.
+            // app can't do: let it through where that matters. With Sweep TV the default home app, Android opens
+            // Sweep TV itself; on a streaming box, it opens Google TV's home and the window watcher below brings
+            // Sweep TV back over it. Only a TV with another default home has Home caught here.
+            if (isDefaultHome() || streamingBox()) return false;
+            if (consumeDrawerGesture(event)) return true;
+            // Pressed: Sweep TV. Held: the dashboard, which catching Home would otherwise take away.
             if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
                 homeHeld = false;
                 main.postDelayed(homeHold, HOLD_MS);
             } else if (event.getAction() == KeyEvent.ACTION_UP) {
                 main.removeCallbacks(homeHold);
-                if (up && !homeHeld) openHome();
+                if (up && !homeHeld) pressHome(event);
                 homeHeld = false;
             }
             return true;
+        }
+        int id = RemoteKeys.id(event);
+        KeyListener l = learning;
+        String action = l == null && id != 0 && watchButtons(this) ? RemoteKeys.action(this, id) : null;
+        if (RemoteKeys.HOME.equals(action)) {
+            if (consumeDrawerGesture(event)) return true;
+        } else if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+            // Break the double press sequence while letting a pending single press finish.
+            homeDoublePress.clear();
         }
         if (warning != null && (code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER)) {
             if (up) { hideWarning(); Sleep.extend(this); }
             return true;
         }
-        int id = RemoteKeys.id(event);
-        KeyListener l = learning;
         if (l != null && event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
             // What the remote sent, for anyone checking with adb logcat why a button can't be changed (a button the
             // TV's software handles itself never shows up here at all).
@@ -178,14 +202,19 @@ public class SleepService extends AccessibilityService {
                     + (RemoteKeys.learnable(id) ? "" : " (can't be changed)"));
         }
         if (l != null && RemoteKeys.learnable(id)) {
-            if (up) { learning = null; main.post(() -> l.onKey(id)); }
+            if (up) {
+                learning = null;
+                android.view.InputDevice input = event.getDevice();
+                String name = input == null || input.isVirtual() ? "" : input.getName();
+                applyButtonWatching();
+                main.post(() -> l.onKey(id, name));
+            }
             return true;
         }
-        String action = l == null && id != 0 ? RemoteKeys.action(this, id) : null;
         if (action == null) return false;
         String hold = RemoteKeys.holdAction(this, id);
         if (hold == null) {
-            if (up) RemoteKeys.run(this, action);
+            if (up) runRemotePress(event, action);
             return true;
         }
         // Held buttons repeat their down event: only the first starts the wait.
@@ -196,10 +225,51 @@ public class SleepService extends AccessibilityService {
             main.postDelayed(holding, HOLD_MS);
         } else if (event.getAction() == KeyEvent.ACTION_UP) {
             if (holding != null) { main.removeCallbacks(holding); holding = null; }
-            if (up && !held) RemoteKeys.run(this, action);
+            if (up && !held) runRemotePress(event, action);
             held = false;
         }
         return true;
+    }
+
+    private void runRemotePress(KeyEvent event, String action) {
+        if (RemoteKeys.HOME.equals(action)) pressHome(event);
+        else RemoteKeys.run(this, action);
+    }
+
+    private void pressHome(KeyEvent event) {
+        if (drawerGestureEnabled() && HomeDoublePress.isShortRelease(event)) {
+            main.removeCallbacks(singleHome);
+            main.postAtTime(singleHome, event.getEventTime() + HomeDoublePress.WINDOW_MS);
+        } else {
+            openHome();
+        }
+    }
+
+    private boolean drawerGestureEnabled() {
+        return watchButtons(this) && RemoteKeys.doubleHomeDrawer(this);
+    }
+
+    private boolean consumeDrawerGesture(KeyEvent event) {
+        if (!drawerGestureEnabled() || !homeDoublePress.handle(event)) return false;
+        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+            main.removeCallbacks(singleHome);
+            // A missing release still lets the original tap finish.
+            main.postAtTime(singleHome, event.getEventTime() + HOLD_MS);
+        } else if (event.getAction() == KeyEvent.ACTION_UP) {
+            main.removeCallbacks(singleHome);
+            if (HomeDoublePress.isShortRelease(event)) {
+                openedAt = SystemClock.elapsedRealtime();
+                RemoteKeys.run(this, RemoteKeys.APP_DRAWER_GESTURE);
+            } else {
+                singleHome.run();
+            }
+        }
+        return true;
+    }
+
+    private void cancelHomeGesture() {
+        main.removeCallbacks(singleHome);
+        homeDoublePress.clear();
     }
 
     /** Reports the next remote button to {@code l} (or stops listening, with null). False if the service is off. */
@@ -295,7 +365,7 @@ public class SleepService extends AccessibilityService {
     }
 
     /**
-     * System apps that can be the home screen, other than Talkies and the boot-time fallbacks (negative priority):
+     * System apps that can be the home screen, other than Sweep TV and the boot-time fallbacks (negative priority):
      * Google TV's launcher, Android TV's, or the TV maker's. Window events are then limited to them, JioHotstar and
      * the Assistant.
      */
@@ -312,6 +382,7 @@ public class SleepService extends AccessibilityService {
             stockPackages.add(ai.packageName);
         }
         java.util.Set<String> watched = new java.util.HashSet<>(stockPackages);
+        watched.add(PATCHWALL);
         watched.add(Cricket.HOTSTAR);
         watched.add(ASSISTANT);
         android.accessibilityservice.AccessibilityServiceInfo info = getServiceInfo();
@@ -324,9 +395,9 @@ public class SleepService extends AccessibilityService {
     }
 
     /**
-     * Talkies settings → Remote keys, On or Off. Unless you chose, it's on once you've given a button a job. Off, the
+     * Sweep TV settings → Remote keys, On or Off. Unless you chose, it's on once you've given a button a job. Off, the
      * service doesn't watch the remote's buttons, because on some TVs any service that does stops a held Volume button
-     * repeating, in every app. Home still reaches Talkies, through the window watcher (Google TV's home may show for a
+     * repeating, in every app. Home still reaches Sweep TV, through the window watcher (Google TV's home may show for a
      * moment). The sleep warning's OK and choosing a button for a remote key turn watching on while they need it.
      */
     static boolean watchButtons(Context c) {
@@ -352,11 +423,14 @@ public class SleepService extends AccessibilityService {
                 : info.flags & ~android.accessibilityservice.AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS;
         setServiceInfo(info);
         filtering = want;
-        if(!want)volume.stop();
+        if (!want) {
+            volume.stop();
+            cancelHomeGesture();
+        }
         Log.i(TAG, want ? "Watching the remote's buttons" : "Remote's buttons left to the TV");
     }
 
-    private boolean talkiesIsDefaultHome() {
+    private boolean isDefaultHome() {
         android.content.pm.ResolveInfo r = getPackageManager().resolveActivity(
                 new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
         return r != null && r.activityInfo != null && getPackageName().equals(r.activityInfo.packageName);
@@ -371,12 +445,15 @@ public class SleepService extends AccessibilityService {
     }
 
     /**
-     * Whether the default home app is a launcher you installed (not Talkies, not one the TV came with, not Android's
-     * "which app?" chooser). Then Talkies stays out of the way of the Home button.
+     * Whether the default home app is a launcher you installed (not Sweep TV, not one the TV came with, not Android's
+     * "which app?" chooser). Then Sweep TV stays out of the way of the Home button.
      */
     private boolean otherLauncherChosen() {
-        android.content.pm.ResolveInfo r = getPackageManager().resolveActivity(
-                new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
+        return otherLauncherChosen(getPackageManager().resolveActivity(
+                new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), android.content.pm.PackageManager.MATCH_DEFAULT_ONLY));
+    }
+
+    private boolean otherLauncherChosen(android.content.pm.ResolveInfo r) {
         if (r == null || r.activityInfo == null) return false;
         String pkg = r.activityInfo.packageName;
         return !pkg.equals(getPackageName()) && !pkg.equals("android") && !stockPackages.contains(pkg)
@@ -386,7 +463,11 @@ public class SleepService extends AccessibilityService {
     void openHome() {
         long now = SystemClock.elapsedRealtime();
         if (now - openedAt < REOPEN_GUARD_MS) return;  // the key and the window it brings up arrive together
-        openedAt = now;
+        launchHome();
+    }
+
+    private void launchHome() {
+        openedAt = SystemClock.elapsedRealtime();
         try {
             startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
                     .setClassName(this, HomeActivity.class.getName())
@@ -404,18 +485,27 @@ public class SleepService extends AccessibilityService {
             try { unregisterReceiver(screenOn); } catch (RuntimeException ignored) { }
             screenOn = null;
         }
+        cancelHomeGesture();
         volume.stop();running = null;
         return super.onUnbind(intent);
     }
 
+    private boolean isHiddenPatchWallHome(CharSequence pkg, CharSequence activity) {
+        return PATCHWALL.contentEquals(pkg)
+                && ((PATCHWALL + ".app.BannerLogoA").contentEquals(activity)
+                    || (PATCHWALL + ".app.PatchWallActivity").contentEquals(activity))
+                && HomeOptions.hiddenApps(this).contains(PATCHWALL);
+    }
+
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {
         CharSequence pkg = event.getPackageName();
+        CharSequence activity = event.getClassName();
         if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && pkg != null) {
             if (ASSISTANT.contentEquals(pkg)) {
                 assistantAt = SystemClock.elapsedRealtime();
-            } else if (stockPackages.contains(pkg.toString()) && event.getClassName() != null
-                    && (stockHomes.contains(pkg + "/" + event.getClassName())
-                        || event.getClassName().toString().endsWith("ProfileChooserActivity"))) {
+            } else if (activity != null && ((stockPackages.contains(pkg.toString())
+                    && (stockHomes.contains(pkg + "/" + activity) || activity.toString().endsWith("ProfileChooserActivity")))
+                    || isHiddenPatchWallHome(pkg, activity))) {
                 // A built-in launcher's home screen, or the "Choose an account" screen Google TV puts up when it starts.
                 if (SystemClock.elapsedRealtime() - assistantAt > ASSISTANT_GRACE_MS) openHome();
                 else assistantAt = SystemClock.elapsedRealtime();  // browsing the results: keep them
@@ -437,5 +527,5 @@ public class SleepService extends AccessibilityService {
     }
 
     @Override public void onInterrupt() {volume.stop();}
-    @Override public void onDestroy(){volume.stop();super.onDestroy();}
+    @Override public void onDestroy(){cancelHomeGesture();volume.stop();super.onDestroy();}
 }

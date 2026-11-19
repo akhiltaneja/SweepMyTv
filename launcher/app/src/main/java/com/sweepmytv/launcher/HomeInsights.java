@@ -18,6 +18,41 @@ import java.util.concurrent.*;
 final class HomeInsights {
     static final String KEY="sweep_insights";
     static final long HOUR=3600_000L;
+
+    enum Widget {
+        AIR("insight_air", "Show AQI"),
+        CALENDAR("insight_festivals", "Show calendar events"),
+        NEWS("insight_news", "Show news headlines");
+
+        final String key, label;
+
+        Widget(String key, String label) {
+            this.key = key;
+            this.label = label;
+        }
+
+        boolean enabled(Context context) {
+            return groupShown(context) && HomeOptions.prefs(context).getBoolean(key, true);
+        }
+
+        void setEnabled(Context context, boolean enabled) {
+            SharedPreferences prefs = HomeOptions.prefs(context);
+            SharedPreferences.Editor edit = prefs.edit();
+            if (enabled && !groupShown(context)) {
+                // A previous global hide should not make the other cards reappear.
+                for (Widget widget : values()) edit.putBoolean(widget.key, false);
+                Set<String> hidden = new HashSet<>(prefs.getStringSet(SectionOptions.HIDDEN, Collections.emptySet()));
+                SectionOptions.update(hidden, KEY, true);
+                edit.putStringSet(SectionOptions.HIDDEN, hidden).putBoolean("insights", true);
+            }
+            edit.putBoolean(key, enabled).apply();
+        }
+    }
+
+    static boolean groupShown(Context context) {
+        return HomeOptions.prefs(context).getBoolean("insights", true) && !SectionOptions.hidden(context, KEY);
+    }
+
     static final class Place {
         final String city,country,region,zone;final double lat,lon;final boolean approximate;
         Place(String city,String country,String region,String zone,double lat,double lon,boolean approximate){this.city=city;this.country=country;this.region=region;this.zone=zone;this.lat=lat;this.lon=lon;this.approximate=approximate;}
@@ -26,6 +61,19 @@ final class HomeInsights {
         JSONObject json()throws Exception{return new JSONObject().put("city",city).put("country",country).put("region",region).put("zone",zone).put("lat",lat).put("lon",lon).put("approximate",approximate);}
         static Place parse(JSONObject o){return o==null?null:new Place(o.optString("city"),o.optString("country"),o.optString("region"),o.optString("zone"),o.optDouble("lat"),o.optDouble("lon"),o.optBoolean("approximate"));}
     }
+    private static final String DELHI_AQI = "https://aqi.delhi.gov.in";
+    private static final ZoneId DELHI_ZONE = ZoneId.of("Asia/Kolkata");
+    private static final DateTimeFormatter DELHI_QUERY_TIME = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss", Locale.ROOT);
+    private static final int AQI_SOURCE_VERSION = 2;
+    static boolean usesDelhiAqi(Place place) {
+        return place != null && "IN".equalsIgnoreCase(place.country)
+                && ("delhi".equals(slug(place.region)) || "delhi".equalsIgnoreCase(place.city)
+                || "new delhi".equalsIgnoreCase(place.city));
+    }
+    static String aqiComparison(Place place) {
+        return usesDelhiAqi(place) ? DELHI_AQI + "/live" : "https://www.aqi.in/";
+    }
+
     static final class Story {
         final String title,url,source,topic;final long published;
         Story(String title,String url,String source,String topic,long published){this.title=title;this.url=url;this.source=source;this.topic=topic;this.published=published;}
@@ -38,12 +86,26 @@ final class HomeInsights {
         static Holiday parse(JSONObject o){return new Holiday(o.optString("title"),o.optString("url"),o.optString("date"));}
     }
     static final class Air {
-        final int aqi;final double pm25;final long at;
-        Air(int aqi,double pm25,long at){this.aqi=aqi;this.pm25=pm25;this.at=at;}
+        final int aqi, stations;
+        final double pm25;
+        final long at;
+        final boolean official;
+        Air(int aqi,double pm25,long at){this(aqi,pm25,at,false,0);}
+        Air(int aqi,double pm25,long at,boolean official,int stations){
+            this.aqi=aqi;this.pm25=pm25;this.at=at;this.official=official;this.stations=stations;
+        }
+        int band() {
+            if (official) return aqi<=50?0:aqi<=100?1:aqi<=200?2:aqi<=300?3:aqi<=400?4:5;
+            return aqi<=50?0:aqi<=100?1:aqi<=150?2:aqi<=200?3:aqi<=300?4:5;
+        }
         boolean valid(long now){return aqi>=0&&at>0&&at<=now+15*60_000L&&now-at<=12*HOUR;}
-        String label(){return aqi<=50?"Good":aqi<=100?"Moderate":aqi<=150?"Unhealthy for sensitive groups":aqi<=200?"Unhealthy":aqi<=300?"Very unhealthy":"Hazardous";}
-        JSONObject json()throws Exception{return new JSONObject().put("aqi",aqi).put("pm25",Double.isFinite(pm25)?pm25:JSONObject.NULL).put("at",at);}
-        static Air parse(JSONObject o){return o==null?null:new Air(o.optInt("aqi",-1),o.optDouble("pm25",Double.NaN),o.optLong("at"));}
+        String label(){
+            String[] labels = official ? new String[]{"Good","Satisfactory","Moderate","Poor","Very poor","Severe"}
+                    : new String[]{"Good","Moderate","Unhealthy for sensitive groups","Unhealthy","Very unhealthy","Hazardous"};
+            return labels[band()];
+        }
+        JSONObject json()throws Exception{return new JSONObject().put("aqi",aqi).put("pm25",Double.isFinite(pm25)?pm25:JSONObject.NULL).put("at",at).put("official",official).put("stations",stations);}
+        static Air parse(JSONObject o){return o==null?null:new Air(o.optInt("aqi",-1),o.optDouble("pm25",Double.NaN),o.optLong("at"),o.optBoolean("official"),o.optInt("stations"));}
     }
     static final class Card {
         String kind,title,kicker,metric,body,foot,url,detail;int color=0xFFBDB6DF;long target;
@@ -58,12 +120,22 @@ final class HomeInsights {
             Channels.Channel row=new Channels.Channel();row.key=KEY;row.title=row.name="At a glance";
             android.content.SharedPreferences p=HomeOptions.prefs(ctx);
             if(p.getBoolean("insight_air",true)){
-                Card c=new Card();c.kind="air";c.kicker="AIR · "+(place==null?"YOUR LOCATION":place.city.toUpperCase(Locale.ROOT));c.title="Local air quality";c.url="https://www.aqi.in/";
-                boolean valid=place!=null&&air!=null&&air.valid(now);c.metric=valid?String.valueOf(air.aqi):"—";
-                c.body=valid?air.label():place==null?"Set a weather location":"Estimate unavailable";
-                c.foot=valid?(now-air.at>3*HOUR||!airError.isEmpty()?"Cached · ":"")+"US AQI · model estimate":"Open-Meteo · CAMS";
-                c.color=valid?air.aqi<=50?0xFF9ED3A5:air.aqi<=100?0xFFE9D48B:air.aqi<=150?0xFFF4B16B:air.aqi<=200?0xFFF28E85:air.aqi<=300?0xFFCAA2DF:0xFFDF93AD:0xFFAAB6CC;
-                c.detail="Open-Meteo / CAMS model estimate, not an AQI.in station reading.\nUS AQI scale; it is different from the Indian AQI scale.\n"+(place==null?"Choose a city in Connections → Keys and location.":place.city+(place.approximate?" · Approximate IP location":"")+"\n")+(valid?"Estimate time: "+time(air.at)+"\nPM2.5: "+(Double.isFinite(air.pm25)?String.format(Locale.US,"%.1f µg/m³",air.pm25):"Unavailable"):airError.isEmpty()?"Waiting for an estimate":airError);
+                Card c=new Card();c.kind="air";c.kicker="AIR · "+(place==null?"YOUR LOCATION":place.city.toUpperCase(Locale.ROOT));c.title="Local air quality";c.url=aqiComparison(place);
+                boolean delhi=usesDelhiAqi(place);
+                boolean valid=place!=null&&air!=null&&air.official==delhi&&air.valid(now);c.metric=valid?String.valueOf(air.aqi):"—";
+                boolean cached=valid&&(now-air.at>3*HOUR||!airError.isEmpty());
+                c.body=valid?air.label():place==null?"Set a weather location":"Reading unavailable";
+                c.foot=valid?(delhi?"":"US AQI estimate"):"";
+                if(cached)c.foot=delhi?"Last available":c.foot+" · Last available";
+                int[] colors={0xFF9ED3A5,0xFFE9D48B,0xFFF4B16B,0xFFF28E85,0xFFCAA2DF,0xFFDF93AD};
+                c.color=valid?colors[air.band()]:0xFFAAB6CC;
+                if (delhi) {
+                    c.detail="Delhi government citywide AQI · CPCB / DPCC monitoring stations\nIndia’s National AQI scale (0–500).\n"
+                            +(valid?"Observed: "+time(air.at)+"\nReporting stations: "+air.stations+"\n"+c.body
+                            +(cached?" · Last available reading":""):airError.isEmpty()?"Waiting for an official reading":airError);
+                } else {
+                    c.detail="Open-Meteo / CAMS model estimate, not an AQI.in station reading.\nUS AQI scale; it is different from the Indian AQI scale.\n"+(place==null?"Choose a city in Connections → Keys and location.":place.city+(place.approximate?" · Approximate IP location":"")+"\n")+(valid?"Estimate time: "+time(air.at)+"\nPM2.5: "+(Double.isFinite(air.pm25)?String.format(Locale.US,"%.1f µg/m³",air.pm25):"Unavailable"):airError.isEmpty()?"Waiting for an estimate":airError);
+                }
                 add(row,c);
             }
             if(p.getBoolean("insight_news",true)){
@@ -105,13 +177,32 @@ final class HomeInsights {
     State cached(){try{State s=State.parse(new JSONObject(prefs.getString("snapshot","{}")));if(!weather.widgetLocationKey().equals(s.locationKey)){s.place=null;s.air=null;s.holidays.clear();s.calendarUrl="";}return s;}catch(Exception e){return State.empty();}}
     static boolean sourceEnabled(Context ctx,String source){String key=source.startsWith("WSJ")?"wsj":source.startsWith("CNBC")?"cnbc":source.equals("CNN")?"cnn":"techcrunch";return HomeOptions.prefs(ctx).getBoolean("insight_source_"+key,true);}
     void refresh(Listener listener){
-        if(running||closed||!HomeOptions.prefs(ctx).getBoolean("insights",true))return;long now=System.currentTimeMillis();String key=weather.widgetLocationKey();
-        if(key.equals(prefs.getString("attempt_location",""))&&now-prefs.getLong("attempt",0)<15*60_000L)return;
-        running=true;prefs.edit().putLong("attempt",now).putString("attempt_location",key).apply();
+        if (running || closed || !groupShown(ctx)) return;
+        SharedPreferences options = HomeOptions.prefs(ctx);
+        if (Arrays.stream(Widget.values()).noneMatch(widget -> options.getBoolean(widget.key, true))) return;
+        long now=System.currentTimeMillis();String key=weather.widgetLocationKey();
+        long interval=prefs.getBoolean("retry_air",false)?3*60_000L:15*60_000L;
+        long elapsed=now-prefs.getLong("attempt",0);
+        if(key.equals(prefs.getString("attempt_location",""))&&prefs.getInt("aqi_source_version",0)==AQI_SOURCE_VERSION&&elapsed>=0&&elapsed<interval)return;
+        running=true;prefs.edit().putLong("attempt",now).putInt("aqi_source_version",AQI_SOURCE_VERSION).putString("attempt_location",key).apply();
         worker.execute(()->{State state=cached();state.locationKey=key;long started=System.currentTimeMillis();List<Future<?>> jobs=new ArrayList<>();
-            try{Place place=(HomeOptions.prefs(ctx).getBoolean("insight_air",true)||HomeOptions.prefs(ctx).getBoolean("insight_festivals",true))?weather.widgetPlace():null;if(place!=null&&(state.place==null||!state.place.key().equals(place.key()))){state.air=null;state.holidays.clear();}state.place=place;}catch(Exception e){state.airError="Location unavailable; choose a city in settings";state.place=null;state.air=null;state.holidays.clear();}
+            try{Place place=(HomeOptions.prefs(ctx).getBoolean("insight_air",true)||HomeOptions.prefs(ctx).getBoolean("insight_festivals",true))?weather.widgetPlace():null;if(place!=null&&(state.place==null||!state.place.key().equals(place.key()))){state.air=null;state.holidays.clear();}state.place=place;}catch(Exception e){state.airError="Location unavailable; choose a city in settings";}
             Place place=state.place;
-            if(place!=null&&HomeOptions.prefs(ctx).getBoolean("insight_air",true))jobs.add(net.submit(()->{try{state.air=parseAir(new JSONObject(get(String.format(Locale.US,"https://air-quality-api.open-meteo.com/v1/air-quality?latitude=%.2f&longitude=%.2f&current=us_aqi,pm2_5&timezone=auto",place.lat,place.lon),256000)),place.timeZone());state.airError="";}catch(Exception e){state.airError="Estimate service unavailable; last valid estimate is labelled cached";}}));
+            if(place!=null&&HomeOptions.prefs(ctx).getBoolean("insight_air",true))jobs.add(net.submit(()->{
+                boolean delhi = usesDelhiAqi(place);
+                try {
+                    if (delhi) {
+                        state.air = parseDelhiAqi(new JSONObject(get(delhiAqiUrl(started),512000)),started);
+                    } else {
+                        Air estimate = parseAir(new JSONObject(get(String.format(Locale.US,"https://air-quality-api.open-meteo.com/v1/air-quality?latitude=%.2f&longitude=%.2f&current=us_aqi,pm2_5&timezone=auto",place.lat,place.lon),256000)),place.timeZone());
+                        if (!estimate.valid(started)) throw new IOException("No recent AQI estimate");
+                        state.air = estimate;
+                    }
+                    state.airError="";
+                } catch(Exception e) {
+                    state.airError=delhi?"Delhi government readings temporarily unavailable":"Estimate service unavailable";
+                }
+            }));
             if(place!=null&&HomeOptions.prefs(ctx).getBoolean("insight_festivals",true)&&(state.holidays.isEmpty()||started-prefs.getLong("holidays_at",0)>48*HOUR))jobs.add(net.submit(()->{try{
                 String country=countrySlug(place.country),region=slug(place.region);String url="https://www.officeholidays.com/ics/"+country;String ics;
                 if(!region.isEmpty()&&Arrays.asList("IN","US","CA","AU").contains(place.country)){try{ics=get(url+"/"+region,1000000);url+="/"+region;}catch(Exception ignored){ics=get(url,1000000);}}else ics=get(url,1000000);
@@ -123,12 +214,29 @@ final class HomeInsights {
             }catch(Exception e){List<Story> saved=new ArrayList<>();for(Story s:state.stories)if(s.source.equals(feed[0])&&freshStory(s,started))saved.add(s);feeds.put(feed[0],saved);statuses.put(feed[0],saved.isEmpty()?"Unavailable":"Unavailable · showing dated cached headlines");}}));
             for(Future<?> job:jobs)try{job.get();}catch(Exception ignored){}
             if(!feeds.isEmpty()){List<Story> merged=new ArrayList<>();for(String[] f:FEEDS)merged.addAll(feeds.getOrDefault(f[0],Collections.emptyList()));state.stories=mergeStories(merged,started);state.sources.clear();for(String[] f:FEEDS)if(statuses.containsKey(f[0]))state.sources.put(f[0],statuses.get(f[0]));}
-            try{prefs.edit().putString("snapshot",state.json().toString()).apply();}catch(Exception ignored){}
+            boolean retryAir=HomeOptions.prefs(ctx).getBoolean("insight_air",true)&&!state.airError.isEmpty();
+            try{prefs.edit().putBoolean("retry_air",retryAir).putString("snapshot",state.json().toString()).apply();}catch(Exception ignored){}
             main.post(()->{running=false;if(!closed&&key.equals(weather.widgetLocationKey()))listener.ready(state);});
         });
     }
     void invalidate(){prefs.edit().remove("attempt").apply();}
     void close(){closed=true;worker.shutdownNow();net.shutdownNow();main.removeCallbacksAndMessages(null);}
+    static String delhiAqiUrl(long now) throws UnsupportedEncodingException {
+        String at=Instant.ofEpochMilli(now).minus(1,ChronoUnit.MINUTES).atZone(DELHI_ZONE).format(DELHI_QUERY_TIME);
+        return DELHI_AQI+"/api/v1/aqi-analytics/public/live-aqi-at?at="+URLEncoder.encode(at,"UTF-8");
+    }
+
+    static Air parseDelhiAqi(JSONObject response,long now)throws Exception {
+        if (!response.optBoolean("success")) throw new IOException("Delhi AQI unavailable");
+        JSONObject data = response.getJSONObject("data");
+        JSONObject city = data.getJSONObject("delhi");
+        int value = city.optInt("current_aqi",-1), stations = city.optInt("reporting_stations");
+        long observed = Instant.parse(data.getString("last_updated")).toEpochMilli();
+        Air air = new Air(value,Double.NaN,observed,true,stations);
+        if (value > 500 || stations <= 0 || !air.valid(now)) throw new IOException("No recent Delhi AQI");
+        return air;
+    }
+
     static Air parseAir(JSONObject o,ZoneId fallback)throws Exception{
         JSONObject cur=o.getJSONObject("current");double number=cur.optDouble("us_aqi",Double.NaN);if(!Double.isFinite(number)||number<0||number>1000)throw new IOException("Invalid AQI");ZoneId zone;try{zone=ZoneId.of(o.optString("timezone"));}catch(Exception e){zone=fallback;}
         return new Air((int)Math.round(number),cur.optDouble("pm2_5",Double.NaN),LocalDateTime.parse(cur.getString("time")).atZone(zone).toInstant().toEpochMilli());
@@ -177,7 +285,10 @@ final class HomeInsights {
     static String safeUrl(String text,String host){try{URI uri=new URI(text);String h=uri.getHost();return "https".equals(uri.getScheme())&&h!=null&&(h.equals(host)||h.endsWith("."+host))&&uri.getUserInfo()==null?uri.toString():"";}catch(Exception e){return "";}}
     static String time(long epoch){return Instant.ofEpochMilli(epoch).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("d MMM, HH:mm",Locale.ENGLISH));}
     static String get(String url,int limit)throws Exception{
-        HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();c.setConnectTimeout(6000);c.setReadTimeout(8000);c.setRequestProperty("User-Agent","SweepTV/1.0 (personal RSS reader)");
+        return get(url,limit,"SweepTV/1.0");
+    }
+    static String get(String url,int limit,String userAgent)throws Exception{
+        HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();c.setConnectTimeout(6000);c.setReadTimeout(8000);c.setRequestProperty("User-Agent",userAgent);
         try{if(c.getResponseCode()!=200)throw new IOException("Source unavailable");try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buffer=new byte[8192];for(int n;(n=in.read(buffer))>0;){if(out.size()+n>limit)throw new IOException("Response too large");out.write(buffer,0,n);}return out.toString("UTF-8");}}finally{c.disconnect();}
     }
 }

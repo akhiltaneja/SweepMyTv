@@ -25,12 +25,13 @@ country/timezone as a coarse fallback when no city metadata is available.
 
 AQI.in rejected automated access during development; no token scraping or access
 workaround was integrated. The user approved a labelled Open-Meteo/CAMS fallback.
-The air card explicitly says **US AQI · model estimate**, with Open-Meteo/CAMS
-attribution. This is not an AQI.in reading, Indian AQI, or a nearby station sensor.
-The value uses the returned US AQI bands and a timestamp in the returned timezone.
-Values older than twelve hours, invalid values and future timestamps are not shown.
-Old/error-preserved estimates say Cached. Details show estimate time and PM2.5;
-a QR code opens AQI.in on the user's phone for comparison.
+Delhi uses the Delhi government's citywide reading and India’s National AQI
+bands. The request uses the portal's local timestamp format. Other cities
+use the Open-Meteo/CAMS estimate and display **US AQI estimate**.
+The widget shows the city, reading and air quality category. Source and observation
+details are available when opened. A failed refresh retries after three minutes
+while Home is active and keeps the last usable reading for that location. The card
+marks it **Last available**. Readings expire after twelve hours.
 
 Source: https://open-meteo.com/en/docs/air-quality-api
 Dataset attribution: Open-Meteo / Copernicus Atmosphere Monitoring Service (CAMS).
@@ -115,6 +116,15 @@ is selected, and resumes on return. OK opens the currently displayed card. Right
 reaches Control Center; Left from Control Center returns to the tile. Down goes to
 the content tabs or dock. The separate row beside the content tabs is gone.
 
-The AQI face is a smaller 96 × 32dp badge; news uses 196 × 36dp and the
+In build 62, the AQI face is a smaller 96 × 32dp badge; news uses 196 × 36dp and the
 calendar uses 148 × 36dp. All faces share a fixed right edge within one reserved
 header slot, so control buttons never shift while the content rotates.
+
+Build 75 / 1.3.0-sweep.29 gives all three faces a shared 196 × 36dp surface
+styled with the current theme. Their content fades and slides in place; the
+surface stays fixed. The separate RAM and disk widget sits beside it. The TV's
+animation setting controls whether rotation animates.
+
+Build 153 / 1.3.0-sweep.107 keeps AQI and market prices in dedicated slots.
+Calendar and device stats alternate in the fixed-width slot to their left.
+If news is enabled it uses that slot too. The weather stays with the greeting.

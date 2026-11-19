@@ -1,8 +1,8 @@
 # Content languages and profile pictures
 
-Build 54 / 1.3.0-sweep.8, 3 November 2026.
+Updated for Sweep TV 1.3.0-sweep.70.
 
-Settings → Watching and discovery → Content languages (also under Profile and greeting)
+Sweep TV settings → Content settings → Content languages
 selects original title languages, independently of the TV's region and UI language.
 English means original-language English, not any film with an English dub. Hindi
 means Hindi, not a combined India/Tamil/Telugu feed. Multiple languages can be
@@ -10,15 +10,16 @@ selected. All languages is an explicit option; turning the last selected languag
 off cannot silently broaden the filter.
 
 The policy applies to TMDB trending, the original discovery tabs, Recommended for
-you, New releases, and app-published recommendation rows. Cached and in-flight
+you, Recently released, and app-published recommendation rows. Cached and in-flight
 results are checked again at display time. Discovery queries request each selected
 language separately and interleave their results; weekly global trends are filtered
 by original_language. An English-only discovery fallback cannot bypass a Hindi-only
 choice. Region still limits subscription availability on installed services.
 
-Continue Watching and the equivalent Watch Next channel remain unfiltered by
-language, as explicitly requested. The existing YouTube toggle and artwork choice
-are retained. App-published recommendation cards with no verifiable original-language
+Continue Watching includes all languages. The Continue tab, Trending and recent
+tabs, and the Continue Watching row below the dock have separate controls. Pick
+which apps can appear and choose title artwork or playback stills. The Apple TV
+resume fallback survives turning off Apple TV in Continue Watching. App-published recommendation cards with no verifiable original-language
 metadata are hidden under a specific language selection. This may hide whole
 provider rows; it never guesses a film's language from the title, poster, region or
 audio tracks. F1, weather, installed apps and other non-film widgets are unaffected.

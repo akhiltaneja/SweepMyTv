@@ -4,21 +4,16 @@ import android.content.Context;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.ViewGroup;
-
 import java.util.List;
 
-/**
- * The picks row: the current pick is a large card at the left edge, the others small cards after it.
- * Moving to another pick springs the widths and slides the row, so the current one always sits at the left.
- * Each child is one pick's view (card on top, title and description below); the card is the child's first child.
- */
+/** A bounded circular title reel. Logical titles repeat; views and artwork caches do not grow. */
 public class PicksRow extends ViewGroup {
-    static final int LARGE_W = 440, SMALL_W = 134, CARD_H = 186, GAP = 18, LEFT = 40, TEXT_H = 48;
-
+    static final int LARGE_W = 440, SMALL_W = 134, CARD_H = 186, GAP = 18, LEFT = 40;
     private final float dp;
-    private float[] curX = new float[0], curW = new float[0], toX, toW;
-    private Spring[] springX = new Spring[0], springW = new Spring[0];
-    private int anchor;
+    private int smallWidth = SMALL_W, expandedWidth = LARGE_W, cardHeight = CARD_H, gap = GAP;
+    private int logicalCount, selected, cycle;
+    private Spring[] widths = new Spring[0];
+    private final Spring camera = new Spring(0.32f, 0.86f, 0, 0.1f);
     private boolean animating;
     private Runnable onFrame;
     private long frameNanos;
@@ -30,114 +25,121 @@ public class PicksRow extends ViewGroup {
         setClipChildren(false);
     }
 
-    int anchor() { return anchor; }
+    int anchor() { return logicalCount == 0 ? 0 : selected % logicalCount; }
+    int selectedIndex() { return selected; }
+    View anchorItem() { return selected < getChildCount() ? getChildAt(selected) : null; }
+    Spring camera() { return camera; }
 
-    /** Called on every animation frame (the focus ring follows the large card). */
+    /** Cover the viewport plus recycling guards, with a fixed number of repeated views. */
+    static int viewCount(int titles, int viewport, int width, int gap) {
+        if (titles < 2) return titles;
+        int needed = (int) Math.ceil(viewport / (double) (width + gap)) + 3;
+        return Math.max(titles, ((needed + titles - 1) / titles) * titles);
+    }
+
+    void fixedCards(int width, int height) {
+        smallWidth = expandedWidth = width;
+        cardHeight = height;
+    }
+
+    static int expandedWidthFor(int width, int height) {
+        if (width <= 0 || height <= 0) return Math.round(CARD_H * 16f / 9);
+        return Math.max(1, Math.min(LARGE_W, Math.round(CARD_H * (float) width / height)));
+    }
+
+    void setExpandedWidth(int width, boolean animate) {
+        if (width == expandedWidth) return;
+        expandedWidth = width;
+        targets(animate);
+    }
+
     void setOnFrame(Runnable r) { onFrame = r; }
+    void setItems(List<View> views, int anchor) { setItems(views, views.size(), anchor); }
 
-    void setItems(List<View> views, int anchor) {
+    void setItems(List<View> views, int titles, int anchor) {
         removeCallbacks(frame);
         animating = false;
         removeAllViews();
-        for (View v : views) addView(v);
-        int n = views.size();
-        curX = new float[n];
-        curW = new float[n];
-        springX = new Spring[n];
-        springW = new Spring[n];
-        this.anchor = Math.max(0, Math.min(anchor, n - 1));
-        targets();
-        for (int i = 0; i < n; i++) {
-            springX[i] = new Spring(0.32f, 0.86f, toX[i], 0.1f);
-            springW[i] = new Spring(0.32f, 0.86f, toW[i], 0.1f);
-        }
-        System.arraycopy(toX, 0, curX, 0, n);
-        System.arraycopy(toW, 0, curW, 0, n);
+        for (View view : views) addView(view);
+        logicalCount = titles;
+        selected = Math.max(0, Math.min(anchor, titles - 1));
+        cycle = 0;
+        widths = new Spring[views.size()];
+        for (int i = 0; i < widths.length; i++)
+            widths[i] = new Spring(0.32f, 0.86f, i == selected ? expandedWidth : smallWidth, 0.1f);
+        camera.snap(selected * (smallWidth + gap));
         requestLayout();
     }
 
-    void setAnchor(int a, boolean animate) {
-        int n = getChildCount();
-        if (n == 0) return;
-        anchor = Math.max(0, Math.min(a, n - 1));
-        targets();
-        for (int i = 0; i < n; i++) {
-            springX[i].target = toX[i];
-            springW[i].target = toW[i];
-            if (!animate) {
-                springX[i].snap(toX[i]);
-                springW[i].snap(toW[i]);
-                curX[i] = toX[i];
-                curW[i] = toW[i];
-            }
+    void setAnchor(int anchor, boolean animate) { setAnchor(anchor, animate, 0); }
+
+    /** Direction disambiguates a two-title reel and keeps boundary movement going the same way. */
+    void setAnchor(int anchor, boolean animate, int direction) {
+        if (logicalCount == 0) return;
+        int next = Math.max(0, Math.min(anchor, logicalCount - 1));
+        int delta = next - anchor();
+        if (direction != 0 && logicalCount > 1) delta = direction;
+        else if (Math.abs(delta) > logicalCount / 2) delta -= Integer.signum(delta) * logicalCount;
+        int position = selected + delta;
+        cycle += Math.floorDiv(position, getChildCount());
+        selected = Math.floorMod(position, getChildCount());
+        targets(animate);
+    }
+
+    private float targetPeriod() {
+        return getChildCount() * (smallWidth + gap) + expandedWidth - smallWidth;
+    }
+
+    private void targets(boolean animate) {
+        for (int i = 0; i < widths.length; i++) {
+            widths[i].target = i == selected ? expandedWidth : smallWidth;
+            if (!animate) widths[i].snap(widths[i].target);
         }
+        camera.target = selected * (smallWidth + gap) + cycle * targetPeriod();
         if (!animate) {
+            camera.snap(camera.target);
+            rebase();
+            layoutItems();
             requestLayout();
-            return;
-        }
-        if (!animating) {
+        } else if (!animating) {
             animating = true;
             frameNanos = 0;
             postOnAnimation(frame);
         }
     }
 
-    /** One frame of the slide: springs keep their speed when you press again mid-slide. */
+    private void rebase() {
+        // Only after settling: rebasing mid-resize would change the camera's phase.
+        camera.snap(selected * (smallWidth + gap));
+        cycle = 0;
+    }
+
     private void step() {
         long now = System.nanoTime();
         float dt = frameNanos == 0 ? 1 / 60f : Math.min(0.05f, (now - frameNanos) / 1e9f);
         frameNanos = now;
-        boolean moving = false;
-        for (int i = 0; i < springX.length && i < curX.length; i++) {
-            moving |= springX[i].step(dt) | springW[i].step(dt);
-            curX[i] = springX[i].value;
-            curW[i] = springW[i].value;
-        }
-        // Only this row changes geometry. Requesting a root layout every frame also remeasured
-        // all the F1/recommendation rows below it on low-powered TVs.
+        boolean moving = camera.step(dt);
+        for (Spring width : widths) moving |= width.step(dt);
+        if (!moving) rebase();
         layoutItems();
         if (onFrame != null) onFrame.run();
         if (moving) postOnAnimation(frame);
         else animating = false;
     }
 
-    /** The large card of the current pick (for the focus ring), or null. */
     View anchorCard() {
-        if (anchor >= getChildCount()) return null;
-        View item = getChildAt(anchor);
+        View item = anchorItem();
         return item instanceof ViewGroup ? ((ViewGroup) item).getChildAt(0) : item;
     }
 
-    private void targets() {
-        int n = getChildCount();
-        toX = new float[n];
-        toW = new float[n];
-        for (int i = 0; i < n; i++) {
-            if (i < anchor) {
-                toX[i] = LEFT - (anchor - i) * (SMALL_W + GAP);
-                toW[i] = SMALL_W;
-            } else if (i == anchor) {
-                toX[i] = LEFT;
-                toW[i] = LARGE_W;
-            } else {
-                toX[i] = LEFT + LARGE_W + GAP + (i - anchor - 1) * (SMALL_W + GAP);
-                toW[i] = SMALL_W;
-            }
-        }
-        for (int i = 0; i < n; i++) {
-            View meta = getChildAt(i).findViewWithTag("meta");
-            if (meta != null) meta.animate().alpha(i == anchor ? 1f : 0f).setDuration(200).start();
-        }
-    }
-
-    @Override
-    protected void onMeasure(int w, int h) {
-        int height = Math.round((CARD_H + TEXT_H) * dp);
-        for (int i = 0; i < getChildCount(); i++) {
-            getChildAt(i).measure(MeasureSpec.makeMeasureSpec(Math.round(curW[i] * dp), MeasureSpec.EXACTLY),
+    @Override protected void onMeasure(int w, int h) {
+        int width = MeasureSpec.getMode(w) == MeasureSpec.UNSPECIFIED
+                ? getResources().getDisplayMetrics().widthPixels : MeasureSpec.getSize(w);
+        int height = Math.round(cardHeight * dp);
+        for (int i = 0; i < getChildCount(); i++)
+            getChildAt(i).measure(MeasureSpec.makeMeasureSpec(Math.round(widths[i].value * dp), MeasureSpec.EXACTLY),
                     MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
-        }
-        setMeasuredDimension(MeasureSpec.getSize(w), height);
+        setMeasuredDimension(width, height);
     }
 
     @Override protected void onDetachedFromWindow() {
@@ -146,17 +148,26 @@ public class PicksRow extends ViewGroup {
         super.onDetachedFromWindow();
     }
 
-    @Override
-    protected void onLayout(boolean changed, int l, int t, int r, int b) { layoutItems(); }
+    @Override protected void onLayout(boolean changed, int l, int t, int r, int b) { layoutItems(); }
 
     private void layoutItems() {
-        int height=Math.round((CARD_H+TEXT_H)*dp);
+        float period = 0;
+        for (Spring width : widths) period += width.value + gap;
+        if (period <= 0) return;
+        float base = 0;
+        int height = Math.round(cardHeight * dp);
         for (int i = 0; i < getChildCount(); i++) {
-            View c = getChildAt(i);
-            int width=Math.round(curW[i]*dp),x=Math.round(curX[i]*dp);
-            if(c.getMeasuredWidth()!=width||c.isLayoutRequested())
-                c.measure(MeasureSpec.makeMeasureSpec(width,MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(height,MeasureSpec.EXACTLY));
-            c.layout(x, 0, x + width, height);
+            View child = getChildAt(i);
+            float position = base - camera.value;
+            // Recycle fully to the left; the next cycle is already laid out at the right.
+            if (logicalCount > 1)
+                position -= (float) Math.floor((position + widths[i].value + gap) / period) * period;
+            int width = Math.round(widths[i].value * dp), x = Math.round((LEFT + position) * dp);
+            if (child.getMeasuredWidth() != width || child.isLayoutRequested())
+                child.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+                        MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
+            child.layout(x, 0, x + width, height);
+            base += widths[i].value + gap;
         }
         invalidate();
     }

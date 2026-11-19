@@ -17,6 +17,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -27,7 +28,7 @@ import java.util.Set;
  * "next episode" entries are used; "new season" and watchlist entries are promotions, not things you watched.
  * Blocking (database + artwork downloads): call it off the main thread.
  * Episodes you haven't started (the "next episode" entries) don't show the app's still from them, which can give the
- * story away (Talkies settings → Hide spoilers): the app's poster when it's landscape, else the still blurred, with
+ * story away (Sweep TV settings → Hide spoilers): the app's poster when it's landscape, else the still blurred, with
  * a portrait poster on the small cards. An idea from harrydbarnes (discussion #14).
  */
 final class WatchNext {
@@ -41,7 +42,7 @@ final class WatchNext {
         File dir = new File(c.getExternalFilesDir(null), "recent/watchnext");
         boolean hideSpoilers = hideSpoilers(c);
         Set<String> keep = new HashSet<>();
-        boolean applePublished=false,allowCache=true;
+        boolean applePublished=false,allowCache=true,complete=false;
         String[] cols = {
                 TvContract.WatchNextPrograms.COLUMN_PACKAGE_NAME, TvContract.WatchNextPrograms.COLUMN_TITLE,
                 TvContract.WatchNextPrograms.COLUMN_EPISODE_TITLE, TvContract.WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER,
@@ -51,24 +52,35 @@ final class WatchNext {
                 TvContract.WatchNextPrograms.COLUMN_THUMBNAIL_URI, TvContract.WatchNextPrograms.COLUMN_POSTER_ART_URI,
                 TvContract.WatchNextPrograms.COLUMN_INTENT_URI, TvContract.WatchNextPrograms.COLUMN_BROWSABLE,
                 TvContract.WatchNextPrograms.COLUMN_DURATION_MILLIS, TvContract.WatchNextPrograms.COLUMN_TYPE,
+                TvContract.WatchNextPrograms.COLUMN_CANONICAL_GENRE, TvContract.WatchNextPrograms.COLUMN_RELEASE_DATE,
         };
         try (Cursor cur = c.getContentResolver().query(TvContract.WatchNextPrograms.CONTENT_URI, cols, null, null,
                 TvContract.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS + " DESC")) {
             if(cur==null){out=AppleResumeCache.reconcile(c,out,false,System.currentTimeMillis());TitleArtwork.resolveRecent(c,out);return out;}
             Log.i(TAG, cur.getCount() + " rows");
-            while (cur.moveToNext() && out.size() < MAX) {
+            List<Integer> selected = new ArrayList<>(MAX);
+            List<Integer> extra = new ArrayList<>(MAX);
+            Set<String> seen = new HashSet<>();
+            while (cur.moveToNext() && selected.size() < MAX) {
                 String pkg = cur.getString(0);
-                if(AppleResumeCache.PACKAGE.equals(pkg))applePublished=true;
+                if (AppleResumeCache.PACKAGE.equals(pkg)) applePublished = true;
                 int type = cur.isNull(5) ? -1 : cur.getInt(5);
                 boolean browsable = cur.isNull(11) || cur.getInt(11) != 0;
-                Log.i(TAG, "row " + pkg + " type=" + type + " browsable=" + browsable + " intent=" + !cur.isNull(10)
-                        + " engaged=" + (cur.isNull(6) ? "-" : new java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US).format(new java.util.Date(cur.getLong(6))))
-                        + " " + str(cur, 1));
                 if (type != TvContract.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE
                         && type != TvContract.WatchNextPrograms.WATCH_NEXT_TYPE_NEXT) continue;
-                if (!browsable || pkg == null || !ContinueOptions.include(c,pkg)
+                if (!browsable || pkg == null || str(cur, 1).isEmpty() || !ContinueOptions.include(c, pkg)
                         || c.getPackageManager().getLeanbackLaunchIntentForPackage(pkg) == null) continue;
 
+                // Reserve each app's latest entry before filling spare slots with other recent titles.
+                if (seen.add(pkg)) selected.add(cur.getPosition());
+                else if (extra.size() < MAX) extra.add(cur.getPosition());
+            }
+            selected.addAll(extra.subList(0, Math.min(MAX - selected.size(), extra.size())));
+            Collections.sort(selected);
+            for (int positionInCursor : selected) {
+                if (!cur.moveToPosition(positionInCursor)) continue;
+                String pkg = cur.getString(0);
+                int type = cur.getInt(5);
                 String title = str(cur, 1), episode = str(cur, 2), season = str(cur, 3), number = str(cur, 4);
                 // The line under the card: "Season 2 · Episode 1 · Prime Video" (or the episode's name).
                 StringBuilder m = new StringBuilder();
@@ -90,8 +102,11 @@ final class WatchNext {
                 p.at = cur.isNull(6) ? 0 : cur.getLong(6);
                 p.intentUri = str(cur, 10).isEmpty() ? null : str(cur, 10);
                 String art = !str(cur, 8).isEmpty() ? str(cur, 8) : str(cur, 9);
+                int contentType = cur.isNull(13) ? -1 : cur.getInt(13);
+                p.mediaKind = mediaKind(contentType);
+                p.providerGenres = genreLabels(str(cur, 14));
+                p.releaseDate = str(cur, 15);
                 if (ContinueOptions.titleArtwork(c)) {
-                    int contentType=cur.isNull(13)?-1:cur.getInt(13);
                     boolean titleLevel=contentType==TvContract.WatchNextPrograms.TYPE_MOVIE||contentType==TvContract.WatchNextPrograms.TYPE_TV_SERIES||contentType==TvContract.WatchNextPrograms.TYPE_TV_SEASON;
                     TitleArtwork.apply(c,p,str(cur,9),str(cur,8),titleLevel);
                     if(p.poster!=null)keep.add(p.poster.getName());
@@ -104,30 +119,78 @@ final class WatchNext {
                         File still = art.isEmpty() ? null : cached(c, dir, art);
                         p.image = still == null ? null : blurred(still);
                         if (still != null) keep.add(still.getName());  // kept, so the blur isn't redone each time
-                        if (poster != null) { p.poster = poster; keep.add(poster.getName()); }
+                        if (ArtworkAssets.portrait(poster)) p.poster = poster;
                     }
                 } else {
                     p.image = art.isEmpty() ? null : cached(c, dir, art);
+                    String posterUri = str(cur, 9);
+                    File poster = posterUri.isEmpty() ? null : posterUri.equals(art) ? p.image : cached(c, dir, posterUri);
+                    if (ArtworkAssets.portrait(poster)) p.poster = poster;
                 }
                 if (p.image != null) keep.add(p.image.getName());
                 out.add(p);
             }
+            complete=true;
         } catch (SecurityException e) {
             allowCache=false;
-            Log.w(TAG, "No permission to read Watch Next: " + e.getMessage());
+            Log.w(TAG, "No permission to read Watch Next");
         } catch (Exception e) {
-            Log.w(TAG, "Could not read Watch Next: " + e);
+            Log.w(TAG, "Could not read Watch Next: " + e.getClass().getSimpleName());
         }
         if(allowCache)out=AppleResumeCache.reconcile(c,out,applePublished,System.currentTimeMillis());
         TitleArtwork.resolveRecent(c,out);
+        if(complete)AppleResumeCache.saveHome(c,out,System.currentTimeMillis());
         for(Trending.Pick p:out){if(p.image!=null)keep.add(p.image.getName());if(p.poster!=null)keep.add(p.poster.getName());}
+        if (!ContinueOptions.include(c, AppleResumeCache.PACKAGE)) {
+            for (Trending.Pick cached : AppleResumeCache.restore(c, System.currentTimeMillis())) {
+                if (cached.image != null) keep.add(cached.image.getName());
+                if (cached.poster != null) keep.add(cached.poster.getName());
+            }
+        }
         File[] files = dir.listFiles();
         if (files != null) for (File f : files) if (!keep.contains(f.getName())) f.delete();
         Log.i(TAG, out.size() + " to show");
         return out;
     }
 
-    /** Talkies settings → Hide spoilers (off unless you turn it on: the app's own stills are what people expect). */
+    private static String mediaKind(int type) {
+        switch (type) {
+            case TvContract.WatchNextPrograms.TYPE_MOVIE:
+                return "movie";
+            case TvContract.WatchNextPrograms.TYPE_TV_SERIES:
+            case TvContract.WatchNextPrograms.TYPE_TV_SEASON:
+            case TvContract.WatchNextPrograms.TYPE_TV_EPISODE:
+                return "tv";
+            default:
+                return "";
+        }
+    }
+
+    static String genreLabels(String encoded) {
+        Set<String> labels = new java.util.LinkedHashSet<>();
+        for (String genre : TvContract.Programs.Genres.decode(encoded)) {
+            String label;
+            switch (genre) {
+                case "COMEDY": label = "Comedy"; break;
+                case "DRAMA": label = "Drama"; break;
+                case "DOCUMENTARY": label = "Documentary"; break;
+                case "ACTION": label = "Action"; break;
+                case "THRILLER": label = "Thriller"; break;
+                case "HORROR": label = "Horror"; break;
+                case "FANTASY": label = "Fantasy"; break;
+                case "SCI_FI": label = "Sci-Fi"; break;
+                case "FAMILY_KIDS": label = "Family"; break;
+                case "MUSIC": label = "Music"; break;
+                case "SPORTS": label = "Sports"; break;
+                default: continue;
+            }
+            labels.add(label);
+            if (labels.size() == 2) break;
+        }
+        return String.join(" / ", labels);
+    }
+
+    /** Sweep TV settings → Hide spoilers (off unless you turn it on: the app's own stills are what people expect). */
     static boolean hideSpoilers(Context c) {
         return c.getSharedPreferences("home", Context.MODE_PRIVATE).getBoolean("hide_spoilers", false);
     }

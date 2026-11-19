@@ -8,13 +8,13 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * The apps you opened most recently through Talkies (the dock, All apps, picks, channel cards, remote buttons), newest
- * first: Control Center → Recent apps, or a remote button set to it. Only what Talkies itself opened, so the
+ * The apps you opened most recently through Sweep TV (the dock, All apps, picks, channel cards, remote buttons), newest
+ * first: Control Center → Recent apps, or a remote button set to it. Only what Sweep TV itself opened, so the
  * accessibility service still watches no other app's windows. An idea from tvOS Launcher's Recent Apps.
  */
 final class RecentApps {
     static final int MAX = 12;
-    /** How many are remembered for Talkies settings → All apps order → Recently opened. */
+    /** How many are remembered for Sweep TV settings → All apps order → Recently opened. */
     private static final int KEEP = 100;
 
     private RecentApps() { }

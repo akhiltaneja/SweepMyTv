@@ -14,13 +14,22 @@ import java.util.*;
 final class ArtworkAssets {
     static final long WEEK=7L*24*3600_000, RETRY=30*60_000;
     static final long MAX_BYTES=12L*1024*1024, CACHE_BYTES=64L*1024*1024;
-    private static final android.util.LruCache<String,int[]> SIZES=new android.util.LruCache<>(128);
+    private static final android.util.LruCache<String,int[]> SIZES=new android.util.LruCache<>(512);
     private static final java.util.concurrent.ConcurrentHashMap<String,Object> LOCKS=new java.util.concurrent.ConcurrentHashMap<>();
     private ArtworkAssets(){}
     static File dir(Context c){return new File(c.getExternalFilesDir(null),"recent/title-artwork-v2");}
     static String hash(String value){return hex(digest().digest(value.getBytes(StandardCharsets.UTF_8)));}
     private static MessageDigest digest(){try{return MessageDigest.getInstance("SHA-256");}catch(Exception e){throw new IllegalStateException(e);}}
-    private static String hex(byte[] bytes){StringBuilder s=new StringBuilder();for(byte b:bytes)s.append(String.format(Locale.ROOT,"%02x",b&255));return s.toString();}
+    private static String hex(byte[] bytes) {
+        char[] digits = "0123456789abcdef".toCharArray();
+        char[] encoded = new char[bytes.length * 2];
+        for (int i = 0; i < bytes.length; i++) {
+            int value = bytes[i] & 0xff;
+            encoded[i * 2] = digits[value >>> 4];
+            encoded[i * 2 + 1] = digits[value & 0x0f];
+        }
+        return new String(encoded);
+    }
     static JSONObject read(File f){try{if(!f.isFile()||f.length()>16384)return new JSONObject();return new JSONObject(new String(java.nio.file.Files.readAllBytes(f.toPath()),StandardCharsets.UTF_8));}catch(Exception e){return new JSONObject();}}
     static void write(File f,JSONObject value){try{f.getParentFile().mkdirs();File temp=new File(f+".part");try(OutputStream out=new FileOutputStream(temp)){out.write(value.toString().getBytes(StandardCharsets.UTF_8));}if(!temp.renameTo(f))temp.delete();}catch(Exception ignored){}}
     static File saved(Context c,String name){return saved(dir(c),name);}

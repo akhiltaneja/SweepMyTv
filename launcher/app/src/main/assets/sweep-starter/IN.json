@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "region": "IN",
+  "titles": [
+    {
+      "id": "tt5875444",
+      "kind": "tv",
+      "title": "Slow Horses",
+      "provider": "apple-tv-plus",
+      "row": "trending",
+      "language": "en",
+      "link": "https://tv.apple.com/in/show/slow-horses/umc.cmc.2szz3fdt71tl1ulnbp8utgq5o",
+      "editorial_rank": 1
+    },
+    {
+      "id": "tt17491088",
+      "kind": "tv",
+      "title": "The Diplomat",
+      "provider": "netflix",
+      "row": "trending",
+      "language": "en",
+      "link": "https://www.netflix.com/in/title/81288983",
+      "editorial_rank": 2
+    },
+    {
+      "id": "tt23112594",
+      "kind": "tv",
+      "title": "VisionQuest",
+      "provider": "jiohotstar",
+      "row": "trending",
+      "language": "en",
+      "link": "https://www.hotstar.com/in/shows/visionquest/1271652472?search_query=vision+quest",
+      "editorial_rank": 3
+    },
+    {
+      "id": "tt31709918",
+      "kind": "tv",
+      "title": "The Split Up",
+      "provider": "prime",
+      "row": "new",
+      "language": "en",
+      "link": "https://www.primevideo.com/detail/0ITQQNIU79KRUNHRDYI9VX6XAC",
+      "editorial_rank": 4
+    },
+    {
+      "id": "tt16311594",
+      "kind": "movie",
+      "title": "F1 The Movie",
+      "provider": "apple-tv-plus",
+      "row": "trending",
+      "language": "en",
+      "link": "https://tv.apple.com/in/movie/f1-the-movie/umc.cmc.3t6dvnnr87zwd4wmvpdx5came",
+      "editorial_rank": 5
+    },
+    {
+      "id": "tt31036941",
+      "kind": "movie",
+      "title": "Jurassic World Rebirth",
+      "provider": "netflix",
+      "row": "trending",
+      "language": "en",
+      "link": "https://www.netflix.com/in/title/81956629",
+      "editorial_rank": 6
+    },
+    {
+      "id": "tt15715850",
+      "kind": "tv",
+      "title": "The Greatest",
+      "provider": "prime",
+      "row": "new",
+      "language": "en",
+      "link": "https://www.primevideo.com/detail/0OBM77GPYM2VYKXSR9MWW80Z4J?ref_=atv_sr_fle_c_sr9fee6d_pvsearchresults_1_1",
+      "editorial_rank": 7
+    },
+    {
+      "id": "tt32890033",
+      "kind": "movie",
+      "title": "Minions & Monsters",
+      "provider": "jiohotstar",
+      "row": "new",
+      "language": "en",
+      "link": "https://www.hotstar.com/in/movies/minions-and-monsters/1271717769",
+      "editorial_rank": 8
+    },
+    {
+      "id": "tt10986410",
+      "kind": "tv",
+      "title": "Ted Lasso",
+      "provider": "apple-tv-plus",
+      "row": "trending",
+      "language": "en",
+      "link": "https://tv.apple.com/in/show/ted-lasso/umc.cmc.vtoh0mn0xn7t3c643xqonfzy",
+      "editorial_rank": 9
+    },
+    {
+      "id": "tt14688458",
+      "kind": "tv",
+      "title": "Silo",
+      "provider": "apple-tv-plus",
+      "row": "trending",
+      "language": "en",
+      "link": "https://tv.apple.com/in/show/silo/umc.cmc.3yksgc857px0k0rqe5zd4jice",
+      "editorial_rank": 10
+    }
+  ]
+}

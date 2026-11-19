@@ -20,14 +20,16 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Your settings in one file, files/talkies-backup.json, to carry them over an uninstall or to another TV: Talkies
+ * Your settings in one file, files/sweep-tv-backup.json, to carry them over an uninstall or to another TV: Sweep TV
  * settings, the dock and app order, hidden apps, remote keys, channels, football leagues, the keys and the weather
  * area. Not the caches (picks, scores, weather), which fetch again. backup-settings.sh asks for it and pulls it;
- * restore-settings.sh pushes it back, and Talkies applies it the next time it starts, then deletes it. The file holds
+ * restore-settings.sh pushes it back, and Sweep TV applies it the next time it starts, then deletes it. The file holds
  * your keys, so it stays on your computer, never in git.
  */
 final class Backup {
-    static final String FILE = "talkies-backup.json";
+    static final String EXTRA_BACKUP = "com.sweepmytv.launcher.BACKUP";
+    static final String EXTRA_RESTORE = "com.sweepmytv.launcher.RESTORE";
+    static final String FILE = "sweep-tv-backup.json";
     private static final String TAG = "GlassBackup";
     private static final int VERSION = 1;
     /** Preference files kept whole: they hold settings only. */
@@ -69,7 +71,7 @@ final class Backup {
     }
 
     /**
-     * Applies files/talkies-backup.json if it's there, then deletes it; call before anything reads the settings.
+     * Applies files/sweep-tv-backup.json if it's there, then deletes it; call before anything reads the settings.
      * True when settings were restored.
      */
     static boolean restoreIfPresent(Context c) {

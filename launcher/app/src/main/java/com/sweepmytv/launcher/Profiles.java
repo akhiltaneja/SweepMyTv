@@ -29,18 +29,19 @@ final class Profiles {
     }
     static void randomizeAvatar(Context c){active(c);avatar(c,unusedRandomAvatar(c));}
     static String name(Context c,String id){return prefs(c).getString("name."+id,"");}
-    static int avatar(Context c){return prefs(c).getInt("avatar."+active(c),0);}
+    static int avatar(Context c){return avatar(c, active(c));}
+    static int avatar(Context c,String id){return prefs(c).getInt("avatar."+id,0);}
     static void avatar(Context c,int index){if(index < -1||index>=Avatars.COUNT)throw new IllegalArgumentException();prefs(c).edit().putInt("avatar."+active(c),index).apply();Avatars.clear();}
     static void remember(Context c){String id=active(c);prefs(c).edit().putString("name."+id,HomeOptions.name(c)).putString("languages."+id,String.join(",",ContentLanguages.selected(c))).commit();}
     static synchronized String add(Context c,String name){
         remember(c);String id=UUID.randomUUID().toString();
         prefs(c).edit().putString("ids",String.join(",",ids(c))+","+id).putString("name."+id,HomeOptions.cleanName(name))
-            .putString("languages."+id,String.join(",",ContentLanguages.selected(c))).putInt("avatar."+id,unusedRandomAvatar(c)).commit();return id;
+            .putString("languages."+id,ContentLanguages.DEFAULT).putInt("avatar."+id,unusedRandomAvatar(c)).commit();return id;
     }
     static boolean switchTo(Context c,String id){
         if(!ids(c).contains(id))return false;remember(c);
         if(!Keys.write(c,HomeOptions.NAME,name(c,id)))return false;
-        c.getSharedPreferences("trending",0).edit().putString("languages",prefs(c).getString("languages."+id,"")).apply();
+        c.getSharedPreferences("trending",0).edit().putString("languages",prefs(c).getString("languages."+id,ContentLanguages.DEFAULT)).apply();
         prefs(c).edit().putString("active",id).commit();Avatars.clear();return true;
     }
     static java.io.File photo(Context c,String id){if(!ids(c).contains(id))throw new IllegalArgumentException();return new java.io.File(c.getFilesDir(),"avatar-"+id+".jpg");}

@@ -20,20 +20,19 @@ import java.util.Set;
 
 /**
  * App channels: the rows apps publish to Android TV ("Top Picks For You" from JioHotstar, "Netflix", "Recommended
- * for you" from YouTube…), plus Watch Next, shown as Projectivy does. You choose which show and their order
- * (Talkies settings → Channels); that is kept in the "channels" preferences. Until you do, Watch Next and the rows
+ * for you" from YouTube…). You choose which show and their order
+ * (Sweep TV settings → App sections); that is kept in the "channels" preferences. Until you do, the rows
  * each app asked Android TV to show on the home screen are shown. Artwork is cached in files/channels/.
  * Reading programs and downloading artwork is blocking: call off the main thread.
  */
 final class Channels {
     private static final String TAG = "GlassChannels";
-    static final String WATCH_NEXT = "watchnext";
     private static final int MAX_ITEMS = 15, ART_W = 440;  // cards are 400 px on screen (424 focused)
     /**
-     * The first rows Talkies ever had (its author's, from Projectivy): kept for TVs that installed Talkies before the
+     * The first rows Sweep TV ever had (its author's, from Projectivy): kept for TVs that installed Sweep TV before the
      * general default, so their rows don't change under them. New installs start from the browsable rows instead.
      */
-    private static final String[] FIRST_SHOWN = {WATCH_NEXT, "in.startv.hotstar|Top Picks For You",
+    private static final String[] FIRST_SHOWN = {"in.startv.hotstar|Top Picks For You",
             "com.netflix.ninja|Netflix", "com.google.android.youtube.tv|Recommended for you",
             "com.amazon.amazonvideo.livingroom|Prime Video"};
 
@@ -49,21 +48,10 @@ final class Channels {
 
     private static SharedPreferences prefs(Context c) { return c.getSharedPreferences("channels", Context.MODE_PRIVATE); }
 
-    static boolean isShown(Context c,String key,boolean fallback){SharedPreferences p=prefs(c);return p.contains("shown")?Arrays.asList(p.getString("shown","").split("\n")).contains(key):fallback;}
-
     /** Every channel that has something in it, in your order, each marked shown or not. Without items. */
-    static List<Channel> list(Context c, int watchNextCount) {
+    static List<Channel> list(Context c) {
         PackageManager pm = c.getPackageManager();
         Map<String, Channel> found = new LinkedHashMap<>();
-        if (watchNextCount > 0) {
-            Channel w = new Channel();
-            w.key = WATCH_NEXT;
-            w.pkg = null;
-            w.name = "Watch Next";
-            w.title = "Watch Next";
-            w.count = watchNextCount;
-            found.put(w.key, w);
-        }
         String[] cols = {TvContract.Channels._ID, TvContract.Channels.COLUMN_PACKAGE_NAME,
                 TvContract.Channels.COLUMN_DISPLAY_NAME, TvContract.Channels.COLUMN_TYPE, TvContract.Channels.COLUMN_BROWSABLE};
         Set<String> browsable = new HashSet<>();  // rows their apps asked Android TV to show on the home screen
@@ -99,7 +87,7 @@ final class Channels {
         }
 
         SharedPreferences p = prefs(c);
-        // Decided once: a TV updating from a Talkies older than the general default keeps the first rows.
+        // Decided once: a TV updating from a Sweep TV older than the general default keeps the first rows.
         String defaults = p.getString("defaults", null);
         if (defaults == null) {
             defaults = updated(c) ? "first" : "browsable";
@@ -111,7 +99,6 @@ final class Channels {
         if (first) {
             start.addAll(Arrays.asList(FIRST_SHOWN));
         } else {
-            start.add(WATCH_NEXT);
             start.addAll(browsable);
             if (browsable.isEmpty()) {
                 // No app marked a row: each app's first.
@@ -119,6 +106,7 @@ final class Channels {
                 for (Channel ch : found.values()) if (ch.pkg != null && apps.add(ch.pkg)) start.add(ch.key);
             }
         }
+        start.removeIf(key -> key.startsWith(Cricket.FANCODE + "|"));
         List<String> order = new ArrayList<>(Arrays.asList(p.getString("order", "").split("\n")));
         Set<String> shown = p.contains("shown") ? new HashSet<>(Arrays.asList(p.getString("shown", "").split("\n"))) : start;
         if (!p.contains("order") && first) order = new ArrayList<>(Arrays.asList(FIRST_SHOWN));
@@ -152,19 +140,19 @@ final class Channels {
         prefs(c).edit().putString("order", order.toString()).putString("shown", shown.toString()).apply();
     }
 
-    /** The shown channels with their items and artwork (Watch Next items are passed in). Blocking. */
-    static List<Channel> loadShown(Context c, List<Trending.Pick> watchNext) {
+    /** The shown channels with their items and artwork, reported a row at a time. Blocking. */
+    static List<Channel> loadShown(Context c, java.util.function.Consumer<List<Channel>> onRowReady) {
         File dir = new File(c.getExternalFilesDir(null), "channels");
         Set<String> keep = new HashSet<>();
         List<Channel> out = new ArrayList<>();
-        for (Channel ch : list(c, watchNext.size())) {
+        for (Channel ch : list(c)) {
+            if (Thread.currentThread().isInterrupted()) return out;
             if (!ch.shown) continue;
-            if (WATCH_NEXT.equals(ch.key)) {
-                ch.items.addAll(watchNext);
-            } else {
-                readItems(c, ch, dir, keep);
+            readItems(c, ch, dir, keep);
+            if (!ch.items.isEmpty()) {
+                out.add(ch);
+                onRowReady.accept(new ArrayList<>(out));
             }
-            if (!ch.items.isEmpty()) out.add(ch);
         }
         File[] files = dir.listFiles();
         if (files != null) for (File f : files) if (!keep.contains(f.getName())) f.delete();
@@ -226,8 +214,12 @@ final class Channels {
                 p.intentUri = str(cur, col[4]).isEmpty() ? null : str(cur, col[4]);
                 String art = !str(cur, col[3]).isEmpty() ? str(cur, col[3]) : str(cur, col[2]);
                 p.id = (ch.key + "\n" + p.title + "\n" + art).hashCode();
-                p.image = art.isEmpty() ? null : WatchNext.cached(c, dir, art, ART_W);
-                if (p.image != null) keep.add(p.image.getName());
+                if (TitleArtwork.prefersCatalog(ch.pkg)) {
+                    TitleArtwork.apply(c, p, null, null, false);
+                } else {
+                    p.image = art.isEmpty() ? null : WatchNext.cached(c, dir, art, ART_W);
+                    if (p.image != null) keep.add(p.image.getName());
+                }
                 ch.items.add(p);
             }
         } catch (Exception e) {

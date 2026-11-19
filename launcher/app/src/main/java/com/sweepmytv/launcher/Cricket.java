@@ -103,10 +103,13 @@ final class Cricket {
         String img1, img2;
         String watchPkg, watchUri;
         String search;                            // no match card found: typed into the app's search ("India vs New Zealand")
+        long scheduledAt;
+        long cachedAt;
         int rank;                                 // lower shows first
         boolean football;                         // a Football match (same card): kind is the league, status the clock
         String short1, short2;                    // football: three-letter names for the score line ("ARS")
-        String league;                            // football: the league's short name for the score line ("EPL")
+        String league;                            // tour, series or league name
+        String venue, phase, session;             // city, match status label, and e.g. "Day 2"
     }
 
     interface Listener { void onMatches(List<Match> matches); }
@@ -423,6 +426,7 @@ final class Cricket {
             m.full1 = a[0];
             m.full2 = b[0];
             m.name = a[0] + " vs " + b[0] + ", " + series;
+            m.league = series;
             m.status = o.optString("status", "");
             m.type = o.optString("matchType", "").toUpperCase(Locale.ROOT);
             // The feed sometimes leaves a match "live" that never started ("Match starts at Oct 18…"): it isn't.

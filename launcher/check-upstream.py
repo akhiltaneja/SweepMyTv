@@ -4,13 +4,16 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 REPOSITORY = "Gathin23/cleanyourtv"
 API = "https://api.github.com/repos/" + REPOSITORY
+PROJECT = "https://github.com/" + REPOSITORY
 
 
 def download(url):
@@ -20,6 +23,42 @@ def download(url):
         if len(value) > 512 * 1024:
             raise ValueError("Upstream response exceeded the size limit")
         return value
+
+
+def verify_release(fetch, release, commit):
+    try:
+        latest = json.loads(fetch(API + "/releases/latest"))
+        tag = latest.get("tag_name", "")
+        if latest.get("draft") or latest.get("prerelease") or latest.get("html_url") != PROJECT + "/releases/tag/" + tag:
+            raise ValueError("Latest release metadata is not an official stable release")
+        check_release_tag(tag, release)
+        upstream_commit = json.loads(fetch(API + "/commits/" + release)).get("sha")
+    except HTTPError as exc:
+        if exc.code not in (403, 429) or exc.headers.get("X-RateLimit-Remaining") != "0":
+            raise
+        upstream_commit = verify_release_on_github(release)
+    if upstream_commit != commit:
+        raise ValueError("The release tag no longer matches the verified commit")
+
+
+def check_release_tag(tag, release):
+    if tag != release:
+        raise ValueError("CleanYourTV " + tag + " needs review before releasing Sweep TV (verified: " + release + ")")
+
+
+def verify_release_on_github(release):
+    # The public latest-release link works independently of the REST API quota.
+    prefix = PROJECT + "/releases/tag/"
+    with urlopen(PROJECT + "/releases/latest", timeout=15) as response:
+        match = re.fullmatch(re.escape(prefix) + r"(v?\d+(?:\.\d+){1,3})", response.geturl())
+    if not match:
+        raise ValueError("Latest release link did not resolve to an official stable tag")
+    check_release_tag(match[1], release)
+    ref = "refs/tags/" + release
+    refs = subprocess.check_output(["git", "ls-remote", "--exit-code", PROJECT + ".git", ref, ref + "^{}"],
+                                   text=True, timeout=15)
+    by_ref = {name: sha for sha, name in (line.split() for line in refs.splitlines())}
+    return by_ref.get(ref + "^{}", by_ref.get(ref))
 
 
 def verify(root, lock, fetch=download, offline=False):
@@ -52,15 +91,7 @@ def verify(root, lock, fetch=download, offline=False):
               "local_components_verified": True, "latest_verified": False, "offline": offline}
     if offline:
         return result
-    latest = json.loads(fetch(API + "/releases/latest"))
-    tag = latest.get("tag_name", "")
-    expected_url = "https://github.com/" + REPOSITORY + "/releases/tag/" + tag
-    if latest.get("draft") or latest.get("prerelease") or latest.get("html_url") != expected_url:
-        raise ValueError("Latest release metadata is not an official stable release")
-    if tag != release:
-        raise ValueError("CleanYourTV " + tag + " needs review before releasing Sweep TV (verified: " + release + ")")
-    if json.loads(fetch(API + "/commits/" + release)).get("sha") != commit:
-        raise ValueError("The release tag no longer matches the verified commit")
+    verify_release(fetch, release, commit)
     for component in components:
         path = component["upstream_path"]
         if not re.fullmatch(r"[A-Za-z0-9_./-]+", path) or ".." in path.split("/"):

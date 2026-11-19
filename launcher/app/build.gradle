@@ -1,5 +1,31 @@
 plugins { id 'com.android.application' }
 
+def catalogAssets = providers.gradleProperty('sweepCatalogAssets').orNull
+def catalogComparison = providers.gradleProperty('sweepCatalogComparison').getOrElse('false').toBoolean()
+def hasCatalogSnapshot = catalogComparison && catalogAssets != null
+def buildModeAssets = layout.buildDirectory.dir('generated/sweep-build-mode')
+def generateSweepBuildMode = tasks.register('generateSweepBuildMode') {
+    inputs.property('comparison', catalogComparison)
+    outputs.dir(buildModeAssets)
+    doLast {
+        File marker = buildModeAssets.get().file('sweep-build-mode.txt').asFile
+        marker.parentFile.mkdirs()
+        marker.text = catalogComparison ? 'comparison\n' : 'distribution\n'
+    }
+}
+if (hasCatalogSnapshot && !file("${catalogAssets}/comparison/IN.json").isFile()) {
+    throw new GradleException('Private sweepCatalogAssets must contain comparison/IN.json')
+}
+def comparisonAssetDir = layout.buildDirectory.dir('generated/sweep-comparison-assets')
+def copyComparisonCatalog = hasCatalogSnapshot ? tasks.register('copyComparisonCatalog', Sync) {
+    from(catalogAssets) { include 'comparison/IN.json' }
+    into(comparisonAssetDir)
+} : null
+tasks.named('preBuild') {
+    dependsOn(generateSweepBuildMode)
+    if (copyComparisonCatalog != null) dependsOn(copyComparisonCatalog)
+}
+
 android {
     namespace 'com.sweepmytv.launcher'
     compileSdk 35
@@ -7,10 +33,20 @@ android {
         applicationId 'com.sweepmytv.launcher'
         minSdk 26          // Android 8.0, the first with home-screen channels (TvContract preview programs)
         targetSdk 35
+        buildConfigField 'String', 'MANAGED_CATALOG_BASE',
+                groovy.json.JsonOutput.toJson(providers.gradleProperty('sweepCatalogBase')
+                        .getOrElse('https://sweep-tv-catalog.akhiltaneja04.workers.dev/catalog'))
+        buildConfigField 'boolean', 'CATALOG_COMPARISON', catalogComparison.toString()
+        buildConfigField 'String', 'INSTALL_COUNT_URL',
+                groovy.json.JsonOutput.toJson(providers.gradleProperty('sweepInstallCountUrl').getOrElse(''))
+        manifestPlaceholders.catalogNetworkConfig = catalogComparison ? '@xml/catalog_comparison_network' : '@xml/catalog_network'
         // Each release: versionName as in CHANGELOG.md, versionCode one higher (Android installs only higher codes as updates).
-        versionCode 71
-        versionName '1.3.0-sweep.25'
+        versionCode 197
+        versionName '1.3.0-sweep.151'
     }
+    if (copyComparisonCatalog != null) sourceSets.main.assets.srcDir(comparisonAssetDir)
+    sourceSets.main.assets.srcDir(buildModeAssets)
+    buildFeatures { buildConfig true }
     // The project's release key, when this computer has it (release.properties, never in git): APKs signed with it
     // can update each other as a single Sweep TV release. Anyone else's build signs with their own debug key.
     def releaseProps = new Properties()

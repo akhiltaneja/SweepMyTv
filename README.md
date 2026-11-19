@@ -6,8 +6,8 @@
   <p><a href="https://sweepmytv.com/">SweepMyTV.com</a> · <a href="#feature-tour">Feature tour</a> · <a href="#tested-tvs">Tested TVs</a> · <a href="docs/building.md">Build from source</a> · <a href="https://github.com/akhiltaneja/SweepMyTv/releases">Releases</a></p>
 </div>
 
-> **[Install SweepMyTV from your phone →](docs/INSTALL.md)**<br>
-> The guide also covers laptop setup and includes a copy-ready Claude Code prompt.
+> **[Install SweepMyTV with Claude Code or Codex →](docs/INSTALL.md)**<br>
+> The guide includes a copy-ready setup prompt and paths for phone, USB and manual computer installation.
 
 <p align="center">
   <a href="docs/media/sweep-home.webp"><img src="docs/media/sweep-home.webp" alt="SweepMyTV home with Continue Watching and the app dock" width="684"></a>
@@ -26,7 +26,7 @@ Screenshots show development builds running on a Redmi TV. Check the [release no
 
 SweepMyTV runs on **Android TV and Google TV devices with Android 8.0 or newer** that allow APK installation. For phone, laptop, and assisted setup, see the [installation guide](docs/INSTALL.md). It also covers [first launch](docs/INSTALL.md#first-launch) and the optional Home and Continue Watching permissions.
 
-**Current download** · `1.3.0-sweep.25` (build 71) is a prerelease that passed local checks. On-device verification for that exact package is pending. The [Tested TVs](#tested-tvs) notes name the build checked on hardware.
+**Current download** · [`1.3.0-sweep.151`](https://github.com/akhiltaneja/SweepMyTv/releases/tag/v1.3.0-sweep.151) (build 197) passed local checks and an in-place update on the Redmi Android TV 10 test device. See [Tested TVs](#tested-tvs) for model-specific coverage.
 
 ## Feature tour
 

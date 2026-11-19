@@ -18,10 +18,61 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parent
 WORKSPACE = ROOT.parent
+PRIVATE_CONTENT = re.compile(
+    rb'-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----'
+    rb'|(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|sk-proj-[A-Za-z0-9_-]{28,})'
+    rb'|(?:AKIA|ASIA)[A-Z0-9]{16}'
+    rb'|[?&](?:api_key|access_token|token|password)=[A-Za-z0-9_-]{20,}'
+)
 
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def public_apk(archive):
+    names = archive.namelist()
+    if names.count('assets/sweep-build-mode.txt') != 1 or archive.read('assets/sweep-build-mode.txt') != b'distribution\n':
+        raise ValueError('Build the distribution APK before packaging a public release')
+    if any(name.startswith(('assets/comparison/', 'assets/catalog/')) or private_path(name) for name in names):
+        raise ValueError('A private asset is present in the release APK')
+    for name in names:
+        verify_public_content(name, archive.read(name))
+
+
+def verify_public_content(name, data):
+    if PRIVATE_CONTENT.search(data):
+        raise ValueError('Possible credential in public file: ' + name)
+
+
+def private_path(name):
+    parts = Path(name).parts
+    return (
+        any(part in {'.git', '.gradle', '.wrangler', '__pycache__', 'node_modules', 'research',
+                     'comparison', 'comparison-assets', 'local.properties', 'release.properties',
+                     'tmdb_key.txt', 'credentials.json', 'secrets.json', 'id_rsa', 'id_ed25519'}
+            or part.startswith(('.env', '.tv-device')) for part in parts)
+        or Path(name).suffix.lower() in {'.pyc', '.sqlite', '.sqlite3', '.db', '.pem', '.p12',
+                                        '.jks', '.keystore', '.log', '.apk'}
+        or any(parts[index:index + 3] == ('catalog', 'cloud', 'public')
+               for index in range(len(parts) - 2))
+        or name.endswith(('-wal', '-shm'))
+    )
+
+
+def release_source(member):
+    if private_path(member.name) or not (member.isdir() or member.isfile()):
+        return None
+    member.uid = member.gid = 0
+    member.uname = member.gname = ''
+    return member
+
+
+def checked_release_source(member):
+    member = release_source(member)
+    if member and member.isfile():
+        verify_public_content(member.name, (WORKSPACE / member.name).read_bytes())
+    return member
 
 
 def package(validation=None):
@@ -51,6 +102,7 @@ def package(validation=None):
         raise ValueError('Release lint has errors')
     # APK must contain the exact bundled release information, not an old successful build.
     with zipfile.ZipFile(source_apk) as apk:
+        public_apk(apk)
         if json.loads(apk.read('assets/sweep-release.json')) != release:
             raise ValueError('Release APK is stale')
     env = dict(os.environ, JAVA_HOME=str(WORKSPACE / 'tools/jdk17/Contents/Home'))
@@ -61,7 +113,7 @@ def package(validation=None):
     validation_data = None
     if validation:
         validation_data = json.loads(validation.read_text())
-        if validation_data.get('version_code') != release['version_code'] or validation_data.get('apk_sha256') != sha(source_apk) or not validation_data.get('tv_installed'):
+        if validation_data.get('version_code') != release['version_code'] or validation_data.get('apk_sha256') != sha(source_apk) or validation_data.get('tv_installed') is not True:
             raise ValueError('TV validation belongs to another APK or is incomplete')
     out = WORKSPACE / 'dist/releases' / version
     out.mkdir(parents=True, exist_ok=True)
@@ -74,18 +126,18 @@ def package(validation=None):
     (out / 'RELEASE_NOTES.md').write_text(notes + '\n')
     source = out / 'source.tar.gz'
     # Explicit source allowlist excludes credentials, signing keys, caches and research history.
-    include = ['app/src', 'app/build.gradle', 'app/proguard-rules.pro', 'build.gradle', 'settings.gradle', 'gradle.properties', 'gradlew', 'gradlew.bat', 'gradle/wrapper', 'build-preview.sh', 'check-upstream.py', 'package-release.py', 'upstream', 'tests', 'companion']
+    include = ['app/src', 'app/build.gradle', 'app/proguard-rules.pro', 'build.gradle', 'settings.gradle', 'gradle.properties', 'gradlew', 'gradlew.bat', 'gradle/wrapper', 'build-preview.sh', 'check-upstream.py', 'check-tv.py', 'package-release.py', 'catalog', 'upstream', 'tests']
     include += [str(p.relative_to(ROOT)) for p in ROOT.glob('*.md')]
     include += ['LICENSE', 'OUTFIT-OFL.txt']
     with tarfile.open(source, 'w:gz') as archive:
         for name in include:
-            archive.add(ROOT / name, arcname='launcher/' + name, filter=lambda i: None if '__pycache__' in i.name or i.name.endswith('.pyc') else i)
-        archive.add(WORKSPACE / 'AGENTS.md', arcname='AGENTS.md')
+            archive.add(ROOT / name, arcname='launcher/' + name, filter=checked_release_source)
+        archive.add(WORKSPACE / 'AGENTS.md', arcname='AGENTS.md', filter=checked_release_source)
     report = {'version': version, 'version_code': release['version_code'], 'apk_sha256': sha(apk), 'source_sha256': sha(source), 'signing_certificate_sha256': signing.group(1), 'upstream': upstream,
               'checked_at': datetime.now(timezone.utc).isoformat(), 'gate_tests': result.testsRun, 'gate_failures': 0, 'android_tests': tests, 'android_failures': 0, 'test_suites': [{'name': x.get('name'), 'tests': int(x.get('tests'))} for x in suites],
               'lint_errors': 0, 'lint_warnings': len(lint.findall("issue[@severity='Warning']")), 'tv_installed': validation_data is not None}
     if validation_data:
-        report['tv_validation'] = validation_data
+        report['tv_validation'] = {key: validation_data[key] for key in ('version_code', 'apk_sha256', 'tv_installed')}
     (out / 'verification.json').write_text(json.dumps(report, indent=2) + '\n')
     names = ['sweep-tv.apk', 'source.tar.gz', 'release.json', 'RELEASE_NOTES.md', 'verification.json']
     (out / 'SHA256SUMS').write_text(''.join(sha(out / n) + '  ' + n + '\n' for n in names))

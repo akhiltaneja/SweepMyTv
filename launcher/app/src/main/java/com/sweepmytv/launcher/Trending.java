@@ -19,6 +19,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -30,6 +31,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Two tabs of picks, kept only when TMDB says the title streams (subscription, not rent/buy) in the TV's country
@@ -51,12 +54,14 @@ final class Trending {
     private static final String BACKDROPS = "https://image.tmdb.org/t/p/w1280", POSTERS = "https://image.tmdb.org/t/p/w500";
     /** The TV's country, read at each refresh (Region). */
     private String region = "US";
-    private static final long REFRESH_MS = 6 * 3600_000L, RETRY_MS = 30 * 60_000L;
+    private static final long RETRY_MS = 30 * 60_000L;
+    // Give the scheduled catalog refresh time to publish while the Home row rotates from its cache.
+    static final long FEED_PUBLISH_DELAY_MS = 10 * 60_000L;
     private static final int MAX_PICKS = 24, MAX_CHECKS = 72;
     static final int SHOWN = 4;
     static final String TRENDING = "trending", INDIA = "india", ENGLISH = "english_discovery", RELEASES = "new_releases";
     /** Bump when picks.json changes shape; the next home screen refreshes right away. */
-    private static final int CACHE_VERSION = 13;
+    private static final int CACHE_VERSION = 16;
     /** YouTube on Android TV, Fire TV, then the phone app, for the trailers when no streaming app is installed. */
     private static final String[] YOUTUBE = {"com.google.android.youtube.tv", "com.amazon.firetv.youtube", "com.google.android.youtube"};
     /** For one refresh: no streaming app matched, so picks are trailers in this YouTube app. */
@@ -85,10 +90,16 @@ final class Trending {
         {"mubi", "com.mubi", "MUBI"},
     };
 
+    static boolean isStreamingApp(String pkg) {
+        for (String[] service : SERVICES) if (service[1].equals(pkg)) return true;
+        for (String youtube : YOUTUBE) if (youtube.equals(pkg)) return true;
+        return false;
+    }
+
     static final class Pick {
         int id;
         String kind;     // "movie" or "tv"
-        String title, pkg, service, tab, lang = "";
+        String title, pkg, service, tab, lang = "", market = "";
         File image;          // landscape picture (TMDB backdrop, or the app's artwork)
         File poster;         // TMDB poster, for the small portrait cards; null when there is none
         transient String backdropPath, posterPath;  // TMDB image paths, while a refresh downloads them
@@ -96,14 +107,18 @@ final class Trending {
         String displayMeta(){return meta+(savedResume?" · Saved resume":"");}
         long at;            // Recently watched: when it was last watched
         String intentUri;   // Recently watched (Watch Next): opens the right title or episode; a trailer pick: the trailer
+        String mediaKind = "", providerGenres = "";
         String meta = "";   // the line under a big card, e.g. "Film · Action · Telugu · Netflix"
         String overview = "", year = "", releaseDate = "";
-        boolean weeklyTrending;
+        String externalId = "", cast = "", ratingSource = "TMDB";
+        boolean weeklyTrending, sweep;
+        int editorialRank;
         float rating;
         float progress = -1; // Continue: how far in (0–1), or -1 when unknown
         Object extra;        // Cricket: the Cricket.Match this card shows
 
-        String key() { return "pick:" + tab + ":" + kind + ":" + id; }
+        String key() { return "pick:" + tab + ":" + catalogIdentity(); }
+        String catalogIdentity() { return kind + ":" + (externalId.isEmpty() ? id : externalId); }
     }
 
     interface Listener { void onPicks(List<Pick> all); }
@@ -119,6 +134,8 @@ final class Trending {
     private static final long SETUP_MS = 7 * 24 * 3600_000L;
     private final Handler main = new Handler(Looper.getMainLooper());
     private boolean running;
+    private int appsRevision;
+    private volatile String displayedSource = "";
 
     Trending(Context c) {
         ctx = c.getApplicationContext();
@@ -127,12 +144,25 @@ final class Trending {
         prefs = c.getSharedPreferences("trending", Context.MODE_PRIVATE);
     }
 
-    // ---------------------------------------------------------------- languages (Talkies settings → Picks languages)
+    void readCached(Listener listener) {
+        String source = catalogSource();
+        Set<String> chosen = languages();
+        worker.execute(() -> {
+            List<Pick> saved = cached();
+            main.post(() -> {
+                if (source.equals(catalogSource()) && chosen.equals(languages())) listener.onPicks(saved);
+            });
+        });
+    }
+
+    void close() { worker.shutdownNow(); }
+
+    // ---------------------------------------------------------------- languages (Sweep TV settings → Picks languages)
 
     /** The original languages picks may be in, as TMDB's codes (ta, en, fr…); empty for all of them. */
     Set<String> languages() {
         Set<String> out = new java.util.LinkedHashSet<>();
-        for (String c : prefs.getString("languages", "").split(",")) if (!c.isEmpty()) out.add(c);
+        for (String c : prefs.getString("languages", ContentLanguages.DEFAULT).split(",")) if (!c.isEmpty()) out.add(c);
         return out;
     }
 
@@ -181,28 +211,148 @@ final class Trending {
         prefs.edit().putString("seen_languages", String.join(",", order)).apply();
     }
 
-    private File keyFile() { return new File(dir.getParentFile(), "tmdb_key.txt"); }
+    String key() { return Keys.activeTmdbKey(ctx); }
 
-    String key() {
-        try (InputStream in = new FileInputStream(keyFile())) {
-            String k = new String(readAll(in), StandardCharsets.UTF_8).trim();
-            return k.isEmpty() ? null : k;
-        } catch (IOException e) {
-            return null;
-        }
+    String catalogSource() {
+        return Keys.catalogEngine(ctx);
     }
 
-    /** Saved picks for one tab whose app is still installed and whose backdrop is on disk. */
-    List<Pick> cached(String tab) {
-        List<Pick> out = new ArrayList<>();
-        for (Pick p : cached()) if (p.tab.equals(tab)) out.add(p);
-        return out;
+    static List<Pick> shelf(List<Pick> catalog, String tab) {
+        Map<String, Pick> distinct = new LinkedHashMap<>();
+        for (Pick p : catalog) {
+            if (!tab.equals(p.tab)) continue;
+            Pick previous = distinct.get(p.catalogIdentity());
+            if (previous == null || previous.intentUri == null && p.intentUri != null) {
+                distinct.put(p.catalogIdentity(), p);
+            }
+        }
+        return new ArrayList<>(distinct.values());
     }
 
     List<Pick> cached() {
+        String engine = catalogSource();
+        if (BuildConfig.CATALOG_COMPARISON && "tmdb".equals(engine)) {
+            List<Pick> titles = key() == null ? new ArrayList<>() : cachedTmdb();
+            if (!titles.isEmpty()) return sourceTitles(titles, "TMDB");
+        }
+        List<Pick> titles = strictSweep(engine);
+        if (!titles.isEmpty()) return sourceTitles(titles, "streamradar".equals(engine) ? "StreamRadar" : "Sweep TV");
+        if (BuildConfig.CATALOG_COMPARISON && !"sweep".equals(engine) && titles.isEmpty()) {
+            titles = strictSweep("streamradar");
+            if (!titles.isEmpty()) return sourceTitles(titles, "StreamRadar fallback");
+            if (Keys.read(ctx, Keys.TMDB) != null) {
+                titles = cachedTmdb();
+                if (!titles.isEmpty()) return sourceTitles(titles, "TMDB fallback");
+            }
+        }
+        return sourceTitles(titles, "More to explore");
+    }
+
+    String displayedSource() { return displayedSource; }
+
+    private List<Pick> sourceTitles(List<Pick> titles, String label) {
+        displayedSource = label;
+        List<Pick> ready = new ArrayList<>();
+        for (Pick pick : titles) {
+            if (!pick.sweep || readySweepPick(pick)) ready.add(pick);
+        }
+        return ready;
+    }
+
+    static boolean readySweepPick(Pick pick) {
+        if (!hasSweepMetadata(pick) || !ArtworkAssets.portrait(pick.poster)) return false;
+        int[] size = ArtworkAssets.size(pick.image);
+        if (size[0] <= 0 || size[1] <= 0) pick.image = pick.poster;
+        return true;
+    }
+
+    private static boolean hasSweepMetadata(Pick pick) {
+        return pick.intentUri != null && !pick.lang.isEmpty() && !pick.overview.trim().isEmpty()
+                && pick.poster != null;
+    }
+
+    List<Pick> cachedProviderFallback(String engine, Set<String> apps) {
+        if (!BuildConfig.CATALOG_COMPARISON) return List.of();
+        List<Pick> fallback = new ArrayList<>();
+        if (!"sweep".equals(engine)) {
+            for (Pick pick : strictSweep("sweep")) {
+                if (apps.contains(pick.pkg) && Recommendations.appCandidate(pick) && readySweepPick(pick)) {
+                    fallback.add(pick);
+                }
+            }
+        }
+        if (!"tmdb".equals(engine) && Keys.read(ctx, Keys.TMDB) != null) {
+            for (Pick pick : cachedTmdb()) {
+                if (apps.contains(pick.pkg) && Recommendations.isAppRow(pick.tab) && ArtworkAssets.portrait(pick.poster)) {
+                    fallback.add(pick);
+                }
+            }
+        }
+        return fallback;
+    }
+
+    List<Pick> cachedSweepRecommendations() {
+        List<Pick> ready = new ArrayList<>();
+        for (Pick pick : strictSweep("sweep")) if (readySweepPick(pick)) ready.add(pick);
+        return ready;
+    }
+
+    private List<Pick> sweepPool(String engine) {
+        if (BuildConfig.CATALOG_COMPARISON && "streamradar".equals(engine)) {
+            try {
+                // Cache files are named by the complete image URL. The two source lists stay independent.
+                return ManagedCatalog.sweepAsset(ctx.getAssets(), "comparison/IN.json", new File(dir, "sweep"));
+            } catch (Exception ignored) { }
+            return new ArrayList<>();
+        }
+        return ManagedCatalog.sweep(Region.country(ctx), new File(dir, "sweep"), ctx.getAssets());
+    }
+
+    private List<Pick> strictSweep(String engine) {
+        String market = Region.country(ctx);
+        Set<String> chosen = languages();
         List<Pick> out = new ArrayList<>();
-        if (key() == null) return out;
-        try (InputStream in = new FileInputStream(new File(dir, "picks.json"))) {
+        for (Pick pick : sweepPool(engine)) {
+            if (market.equals(pick.market) && installed(pick.pkg) && ContentLanguages.allows(chosen, pick.lang)) out.add(pick);
+        }
+        return out;
+    }
+
+    List<Pick> explore() {
+        return explore(true);
+    }
+
+    private List<Pick> explore(boolean requireReady) {
+        String market = Region.country(ctx);
+        List<Pick> pool = sweepPool("sweep");
+        Set<String> chosen = languages();
+        boolean hasProvider = ManagedCatalog.hasInstalledProvider(this::installed);
+        List<Pick> out = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (boolean installedApp : new boolean[]{true, false}) {
+            if (!installedApp && hasProvider) break;
+            for (Pick p : pool) {
+                if (out.size() == 8) return out;
+                if (installed(p.pkg) != installedApp || !ContentLanguages.allows(chosen, p.lang)
+                        || requireReady && !readySweepPick(p)
+                        || !seen.add(p.catalogIdentity())) continue;
+                String language = p.lang.isEmpty() ? "Language unknown" : Region.language(p.lang);
+                Pick card = Recommendations.copy(p, (language.isEmpty() ? p.lang : language)
+                        + (market.equals(p.market) ? "" : " · India catalog"), Recommendations.EXPLORE);
+                card.meta = p.service + " · " + card.meta;
+                if (!market.equals(p.market)) card.intentUri = null;
+                out.add(card);
+            }
+        }
+        return out;
+    }
+
+    private List<Pick> cachedTmdb() {
+        List<Pick> out = new ArrayList<>();
+        String market = Region.country(ctx);
+        File cache = dir;
+        Set<String> chosen = languages();
+        try (InputStream in = new FileInputStream(new File(cache, "picks.json"))) {
             JSONArray a = new JSONArray(new String(readAll(in), StandardCharsets.UTF_8));
             for (int i = 0; i < a.length(); i++) {
                 JSONObject o = a.getJSONObject(i);
@@ -212,19 +362,25 @@ final class Trending {
                 p.title = o.getString("title");
                 p.pkg = o.getString("pkg");
                 p.service = o.getString("service");
-                p.image = new File(dir, o.getString("image"));
+                p.image = new File(cache, o.getString("image"));
                 String poster = o.optString("poster", "");
-                p.poster = poster.isEmpty() || !new File(dir, poster).isFile() ? null : new File(dir, poster);
+                p.poster = poster.isEmpty() || !new File(cache, poster).isFile() ? null : new File(cache, poster);
                 p.tab = o.optString("tab", TRENDING);
                 p.lang = o.optString("lang", "");
+                p.market = o.optString("market");
+                if (!p.market.isEmpty() && !market.equals(p.market)) continue;
+                if (Recommendations.isAppRow(p.tab) && (!market.equals(p.market) || !o.optBoolean("availability_verified"))) continue;
                 p.meta = o.optString("meta", "");
                 p.overview = o.optString("overview", "");
                 p.year = o.optString("year", "");
                 p.rating = (float)o.optDouble("rating",0);
+                p.externalId = o.optString("external_id");
+                p.cast = o.optString("cast");
+                p.ratingSource = o.optString("rating_source", "TMDB");
                 p.releaseDate=o.optString("release_date","");p.weeklyTrending=o.optBoolean("weekly_trending",false);
                 String uri = o.optString("uri", "");
                 p.intentUri = uri.isEmpty() ? null : uri;
-                if (ContentLanguages.allows(languages(),p.lang) && p.image.isFile() && installed(p.pkg)) out.add(p);
+                if (ContentLanguages.allows(chosen,p.lang) && p.image.isFile() && installed(p.pkg)) out.add(p);
             }
         } catch (Exception e) {
             // Nothing saved yet.
@@ -254,40 +410,165 @@ final class Trending {
         if (prefs.getLong("try_at", 0) > prefs.getLong("ok_at", 0)) prefs.edit().remove("try_at").apply();
     }
 
+    void appsChanged() {
+        appsRevision++;
+        prefs.edit().remove("ok_at").remove("try_at").apply();
+    }
+
     void refreshIfStale(Listener l) {
         String key = key();
-        if (key == null || running) return;
+        String cc = Region.country(ctx);
+        String source = catalogSource();
+        if (source.isEmpty() || running || worker.isShutdown()) return;
         long now = System.currentTimeMillis();
         // A new key fetches right away instead of waiting out the old key's timers.
-        String cc = Region.country(ctx), was = prefs.getString("region", null);
+        String was = prefs.getString("region", null);
+        int sourceHash = java.util.Objects.hash(source, key, BuildConfig.MANAGED_CATALOG_BASE, BuildConfig.VERSION_CODE);
         if (was == null) prefs.edit().putString("region", cc).apply();  // first run with countries: just remember it
-        if (prefs.getInt("key_hash", 0) != key.hashCode() || prefs.getInt("version", 0) != CACHE_VERSION
+        if (prefs.getInt("key_hash", 0) != sourceHash || prefs.getInt("version", 0) != CACHE_VERSION
+                || !source.equals(prefs.getString("catalog_source", "tmdb"))
                 || (was != null && !cc.equals(was))
-                || !prefs.getString("languages", "").equals(prefs.getString("languages_fetched", ""))) {
+                || !prefs.getString("languages", ContentLanguages.DEFAULT).equals(prefs.getString("languages_fetched", ""))) {
             // A new key, a new cache layout, the TV now in another country, or other languages: fetch right away.
-            prefs.edit().putInt("key_hash", key.hashCode()).putInt("version", CACHE_VERSION).putString("region", cc)
+            prefs.edit().putInt("key_hash", sourceHash).putString("catalog_source", source)
+                    .putInt("version", CACHE_VERSION).putString("region", cc)
                     .remove("ok_at").remove("try_at").apply();
         }
-        if (now - prefs.getLong("ok_at", 0) < REFRESH_MS || now - prefs.getLong("try_at", 0) < RETRY_MS) return;
+        if (!recommendationFetchDue(now, prefs.getLong("ok_at", 0), prefs.getLong("try_at", 0))) return;
         prefs.edit().putLong("try_at", now).apply();
         running = true;
-        String langs = prefs.getString("languages", "");
+        String langs = prefs.getString("languages", ContentLanguages.DEFAULT);
+        int revision = appsRevision;
         worker.execute(() -> {
-            try {
-                fetch(key);
-                // Fetched for these languages: if they changed meanwhile, the next check fetches again.
-                prefs.edit().putLong("ok_at", System.currentTimeMillis()).putString("languages_fetched", langs).apply();
+            Runnable publish = () -> {
                 List<Pick> all = cached();
-                main.post(() -> l.onPicks(all));
-            } catch (Exception e) {
-                Log.w(TAG, "Refresh failed: " + e.getClass().getSimpleName() + " " + e.getMessage());
+                main.post(() -> {
+                    if (appsRevision == revision && langs.equals(prefs.getString("languages", ContentLanguages.DEFAULT))
+                            && source.equals(catalogSource()) && java.util.Objects.equals(key, key())) l.onPicks(all);
+                });
+            };
+            try {
+                try {
+                    if (BuildConfig.CATALOG_COMPARISON && "tmdb".equals(source) && key != null) fetch(key);
+                    else fetchSweep(cc, source, publish);
+                    // If the languages changed meanwhile, the next check fetches again.
+                    prefs.edit().putLong("ok_at", now).putString("languages_fetched", langs).apply();
+                } catch (InterruptedException interrupted) {
+                    throw interrupted;
+                } catch (Exception e) {
+                    Log.w(TAG, "Refresh failed: " + e.getClass().getSimpleName());
+                }
+                publish.run();
+                refreshComparisonRecommendations(cc, source, publish);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
             } finally {
-                main.post(() -> {running=false;if(!prefs.getString("languages", "").equals(langs))refreshIfStale(l);});
+                main.post(() -> {
+                    running = false;
+                    if (appsRevision != revision) {
+                        prefs.edit().remove("ok_at").remove("try_at").apply();
+                        refreshIfStale(l);
+                    } else if (!prefs.getString("languages", ContentLanguages.DEFAULT).equals(langs)
+                            || !source.equals(catalogSource()) || !java.util.Objects.equals(key, key())) refreshIfStale(l);
+                });
             }
         });
     }
 
     // ---------------------------------------------------------------- fetching
+
+    static boolean recommendationFetchDue(long now, long success, long attempt) {
+        long feedWindow = Recommendations.window(now - FEED_PUBLISH_DELAY_MS);
+        if (success > 0 && success <= now && Recommendations.window(success - FEED_PUBLISH_DELAY_MS) == feedWindow) return false;
+        return attempt <= 0 || attempt > now || Recommendations.window(attempt - FEED_PUBLISH_DELAY_MS) != feedWindow
+                || now - attempt >= RETRY_MS;
+    }
+
+    private void refreshComparisonRecommendations(String market, String engine, Runnable publish) throws InterruptedException {
+        if (!BuildConfig.CATALOG_COMPARISON || "sweep".equals(engine) || !engine.equals(catalogSource())) return;
+        try {
+            ManagedCatalog.refreshSweep(market, new File(dir, "sweep"));
+        } catch (Exception unavailable) {
+            // The last valid feed and bundled starter are still available.
+        }
+        if (!engine.equals(catalogSource())) return;
+        List<Pick> portraits = new ArrayList<>();
+        for (Pick pick : strictSweep("sweep")) if (hasSweepMetadata(pick)) portraits.add(pick);
+        if (portraits.isEmpty()) return;
+        publish.run();
+        ExecutorService images = Executors.newFixedThreadPool(PARALLEL);
+        try {
+            downloadManagedPhase(artworkOrder(portraits), true, images, publish, engine);
+        } finally {
+            images.shutdownNow();
+        }
+    }
+
+    private void fetchSweep(String market, String engine, Runnable publish) throws Exception {
+        Exception refreshError = null;
+        if ("sweep".equals(engine)) {
+            try { ManagedCatalog.refreshSweep(market, new File(dir, "sweep")); }
+            catch (Exception unavailable) { refreshError = unavailable; }
+        }
+        List<Pick> picks = strictSweep(engine);
+        if (BuildConfig.CATALOG_COMPARISON && !"sweep".equals(engine) && picks.isEmpty()) {
+            picks = strictSweep("streamradar");
+            String fallbackKey = Keys.read(ctx, Keys.TMDB);
+            if (picks.isEmpty() && fallbackKey != null) fetch(fallbackKey);
+        }
+        if (picks.isEmpty()) picks = explore(false);
+        publish.run();
+        ExecutorService images = Executors.newFixedThreadPool(PARALLEL);
+        try {
+            List<Pick> ordered = artworkOrder(picks);
+            downloadManagedPhase(ordered, true, images, publish, engine);
+            if (engine.equals(catalogSource())) downloadManagedPhase(ordered, false, images, publish, engine);
+        } finally {
+            images.shutdownNow();
+        }
+        if (refreshError != null) throw refreshError;
+    }
+
+    /** Let each visible provider and shelf receive a first card before deeper catalog entries. */
+    static List<Pick> artworkOrder(List<Pick> picks) {
+        Set<String> groups = new HashSet<>();
+        List<Pick> ordered = new ArrayList<>(), rest = new ArrayList<>();
+        for (Pick pick : picks) {
+            List<Pick> destination = groups.add(pick.pkg + "\n" + pick.tab) ? ordered : rest;
+            destination.add(pick);
+        }
+        ordered.addAll(rest);
+        return ordered;
+    }
+
+    private void downloadManagedPhase(List<Pick> picks, boolean portraits, ExecutorService images, Runnable publish, String engine)
+            throws InterruptedException {
+        Map<File,String> jobs = new LinkedHashMap<>();
+        for (Pick pick : picks) {
+            File file = portraits ? pick.poster : pick.image;
+            String url = portraits ? pick.posterPath : pick.backdropPath;
+            if (file != null && url != null && !file.isFile()) jobs.putIfAbsent(file, url);
+        }
+        ExecutorCompletionService<Boolean> finished = new ExecutorCompletionService<>(images);
+        jobs.forEach((file, url) -> finished.submit(() -> {
+            download(url, file, true);
+            return true;
+        }));
+        long publishedAt = 0;
+        boolean dirty = false;
+        for (int i = 0; i < jobs.size(); i++) {
+            if (!engine.equals(catalogSource())) return;
+            try {
+                dirty |= finished.take().get();
+            } catch (ExecutionException ignored) { }
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (dirty && (publishedAt == 0 || now - publishedAt >= 2000 || i + 1 == jobs.size())) {
+                publish.run();
+                publishedAt = now;
+                dirty = false;
+            }
+        }
+    }
 
     private void fetch(String key) throws Exception {
         if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("Cannot create " + dir);
@@ -340,13 +621,12 @@ final class Trending {
             for (int i = 0; i < a.length(); i++) {
                 JSONObject o = a.getJSONObject(i);
                 String[] s = service(o.getString("provider_name"));
-                if (s != null && !installed(s[1])) s = null;
+                if (s != null && ctx.getPackageManager().getLeanbackLaunchIntentForPackage(s[1]) == null) s = null;
                 if (s == null) s = byName(apps, o.getString("provider_name"));
                 if (s != null) services.put(o.getInt("provider_id"), s);
             }
         }
         Log.i(TAG, "Matched " + services.size() + " TMDB services to installed apps");
-        prefs.edit().putInt("matched", services.size()).apply();
         elsewhere = null;
         if (services.isEmpty()) {
             for (String y : YOUTUBE) if (elsewhere == null && installed(y)) elsewhere = y;
@@ -354,6 +634,23 @@ final class Trending {
             Log.i(TAG, "No streaming apps: trailers in " + elsewhere);
         }
 
+        Set<String> chosen = languages();
+        List<Pick> picks;
+        try {
+            picks = globalPicks(key, services, chosen);
+        } catch (InterruptedException e) {
+            throw e;
+        } catch (Exception e) {
+            Log.w(TAG, "Discovery refresh failed; retaining the saved discovery rows: " + e.getClass().getSimpleName());
+            picks = cachedTmdb();
+            picks.removeIf(p -> Recommendations.isAppRow(p.tab));
+        }
+        picks.addAll(appPicks(key, setup, services, chosen));
+        save(downloadImages(picks));
+    }
+
+    private List<Pick> globalPicks(String key, Map<Integer, String[]> services, Set<String> chosen)
+            throws Exception {
         // 2. Candidates for each tab, then 3. keep those that stream on an installed app (and fetch backdrops).
         StringBuilder ids = new StringBuilder();
         for (int id : services.keySet()) ids.append(ids.length() == 0 ? "" : "|").append(id);
@@ -362,7 +659,6 @@ final class Trending {
 
         // The six candidate lists, all at once. With languages chosen (Picks languages), "New in …" keeps to them, and
         // Trending's two sides become those languages (from anywhere, not only this country) and English, if chosen.
-        Set<String> chosen = languages();
         List<String> others = new ArrayList<>(chosen);
         others.remove("en");
         boolean withEnglish = chosen.isEmpty() || chosen.contains("en");
@@ -372,12 +668,12 @@ final class Trending {
         java.util.concurrent.Future<JSONObject> newShows=laterInLanguages(key,"/discover/tv?air_date.gte="+day(-60)+"&air_date.lte="+day(0)+origin+common,chosen);
         boolean anyLocal=chosen.isEmpty()||!others.isEmpty();
         Set<String> otherLanguages=new java.util.LinkedHashSet<>(others);
-        java.util.concurrent.Future<JSONObject> localFilms=anyLocal?laterInLanguages(key,"/discover/movie?include_adult=false"+origin+popular,otherLanguages):null;
-        java.util.concurrent.Future<JSONObject> localShows=anyLocal?laterInLanguages(key,"/discover/tv?include_adult=false"+origin+popular,otherLanguages):null;
+        java.util.concurrent.Future<JSONObject> localFilms=anyLocal?laterInLanguages(key,"/discover/movie?vote_count.gte=10"+origin+common,otherLanguages):null;
+        java.util.concurrent.Future<JSONObject> localShows=anyLocal?laterInLanguages(key,"/discover/tv?vote_count.gte=10"+origin+common,otherLanguages):null;
         java.util.concurrent.Future<JSONObject> englishFilms=withEnglish?later(key,"/discover/movie?with_original_language=en"+popular):null;
         java.util.concurrent.Future<JSONObject> englishShows=withEnglish?later(key,"/discover/tv?with_original_language=en"+popular):null;
-        java.util.concurrent.Future<JSONObject> discoveryFilms=elsewhere==null?laterInLanguages(key,"/discover/movie?include_adult=false"+popular,chosen):null;
-        java.util.concurrent.Future<JSONObject> discoveryShows=elsewhere==null?laterInLanguages(key,"/discover/tv?include_adult=false"+popular,chosen):null;
+        java.util.concurrent.Future<JSONObject> discoveryFilms=elsewhere==null?laterInLanguages(key,"/discover/movie?vote_count.gte=10"+common,chosen):null;
+        java.util.concurrent.Future<JSONObject> discoveryShows=elsewhere==null?laterInLanguages(key,"/discover/tv?vote_count.gte=10"+common,chosen):null;
         java.util.concurrent.Future<JSONObject> weeklyFilms=elsewhere==null?later(key,"/trending/movie/week"):null;
         java.util.concurrent.Future<JSONObject> weeklyShows=elsewhere==null?later(key,"/trending/tv/week"):null;
         String movieFresh=releasePath("movie",day(-90),day(0),common,false),tvFresh=releasePath("tv",day(-90),day(0),common,false);
@@ -414,7 +710,117 @@ final class Trending {
             List<JSONObject> globalNew=merge(tag(results(recentFilms),"movie"),tag(results(recentShows),"tv"));
             picks.addAll(keepMixed(key,services,RELEASES,new HashSet<>(),new int[]{0,1},englishNew,globalNew));
         }
-        save(downloadImages(picks));
+        return picks;
+    }
+
+    /** Build each service's own regional catalog instead of assigning shared results to the first matching app. */
+    private List<Pick> appPicks(String key, JSONObject setup, Map<Integer, String[]> services, Set<String> chosen)
+            throws Exception {
+        Map<String, Map<String, java.util.concurrent.Future<JSONObject>>> requests = new LinkedHashMap<>();
+        Map<String, String[]> packages = new LinkedHashMap<>();
+        Map<String, Map<String, Set<Integer>>> providerIds = new LinkedHashMap<>();
+        for (String kind : new String[]{"movie", "tv"}) {
+            JSONArray providers = setup.getJSONArray(kind + "_providers");
+            Map<String, List<String>> ids = new LinkedHashMap<>();
+            for (int i = 0; i < providers.length(); i++) {
+                JSONObject provider = providers.getJSONObject(i);
+                int id = provider.getInt("provider_id");
+                // An add-on sold through another service cannot be watched in the standalone app.
+                if (provider.getString("provider_name").toLowerCase(Locale.ROOT).endsWith(" channel")) continue;
+                String[] service = services.get(id);
+                if (service == null || !Recommendations.appProvider(service[1])
+                        || ctx.getPackageManager().getLeanbackLaunchIntentForPackage(service[1]) == null) continue;
+                packages.put(service[1], service);
+                providerIds.computeIfAbsent(service[1], ignored -> new LinkedHashMap<>())
+                        .computeIfAbsent(kind, ignored -> new HashSet<>()).add(id);
+                ids.computeIfAbsent(service[1], ignored -> new ArrayList<>()).add(String.valueOf(id));
+            }
+            for (Map.Entry<String, List<String>> entry : ids.entrySet()) {
+                String path = "/discover/" + kind + "?include_adult=false&sort_by=popularity.desc"
+                        + "&watch_region=" + region + "&with_watch_monetization_types=flatrate|free|ads"
+                        + "&with_watch_providers=" + android.text.TextUtils.join("|", entry.getValue());
+                requests.computeIfAbsent(entry.getKey(), ignored -> new LinkedHashMap<>())
+                        .put(kind, laterInLanguages(key, path, chosen));
+            }
+        }
+        List<Pick> out = new ArrayList<>();
+        List<Pick> previous = cached();
+        for (Map.Entry<String, Map<String, java.util.concurrent.Future<JSONObject>>> app : requests.entrySet()) {
+            String pkg = app.getKey(), tab = Recommendations.appKey(pkg);
+            JSONArray movies = new JSONArray(), shows = new JSONArray();
+            boolean failed = false;
+            for (Map.Entry<String, java.util.concurrent.Future<JSONObject>> request : app.getValue().entrySet()) {
+                try {
+                    JSONArray titles = results(request.getValue());
+                    if ("movie".equals(request.getKey())) movies = titles;
+                    else shows = titles;
+                } catch (java.util.concurrent.ExecutionException | org.json.JSONException e) {
+                    failed = true;
+                    Log.w(TAG, "Couldn't refresh " + pkg + " " + request.getKey() + " recommendations");
+                }
+            }
+            List<Pick> fresh = new ArrayList<>();
+            List<JSONObject> candidates = appCandidates(movies, shows, chosen);
+            Set<String> excluded = java.util.Collections.emptySet();
+            for (int i = 0; i < candidates.size() && fresh.size() < Recommendations.APP_LIMIT; i++) {
+                lookAhead(key, candidates, i, excluded);
+                JSONObject title = candidates.get(i);
+                String kind = title.getString("_kind");
+                try {
+                    java.util.concurrent.Future<JSONObject> lookup = providerLookups.get(kind + title.getInt("id"));
+                    if (lookup == null) continue;
+                    JSONObject providers = lookup.get();
+                    if (!availableInApp(providers, region, providerIds.get(pkg).get(kind))) continue;
+                } catch (java.util.concurrent.ExecutionException e) {
+                    failed = true;
+                    continue;
+                }
+                Pick p = fill(new Pick(), packages.get(pkg), tab, kind, title);
+                p.image = p.poster;
+                p.market = region;
+                fresh.add(p);
+            }
+            if (failed && fresh.isEmpty()) {
+                for (Pick p : previous) if (tab.equals(p.tab)) fresh.add(p);
+            }
+            out.addAll(fresh);
+        }
+        return out;
+    }
+
+    static boolean availableInApp(JSONObject response, String region, Set<Integer> ids) {
+        JSONObject results = response.optJSONObject("results");
+        JSONObject market = results == null ? null : results.optJSONObject(region);
+        if (market == null) return false;
+        for (String type : new String[]{"flatrate", "free", "ads"}) {
+            JSONArray providers = market.optJSONArray(type);
+            for (int i = 0; providers != null && i < providers.length(); i++) {
+                JSONObject provider = providers.optJSONObject(i);
+                if (provider != null && ids.contains(provider.optInt("provider_id"))) return true;
+            }
+        }
+        return false;
+    }
+
+    private static final int MAX_APP_CANDIDATES = Recommendations.APP_LIMIT * 3;
+
+    static List<JSONObject> appCandidates(JSONArray movies, JSONArray shows, Set<String> chosen) throws Exception {
+        List<JSONObject> out = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (int i = 0; i < Math.max(movies.length(), shows.length()) && out.size() < MAX_APP_CANDIDATES; i++) {
+            addAppCandidate(out, seen, movies.optJSONObject(i), "movie", chosen);
+            addAppCandidate(out, seen, shows.optJSONObject(i), "tv", chosen);
+        }
+        return out;
+    }
+
+    private static void addAppCandidate(List<JSONObject> out, Set<String> seen, JSONObject title,
+                                        String kind, Set<String> chosen) throws Exception {
+        if (out.size() >= MAX_APP_CANDIDATES || title == null || title.optBoolean("adult")
+                || title.optInt("id") <= 0 || title.optString("tv".equals(kind) ? "name" : "title").trim().isEmpty()
+                || !ContentLanguages.allows(chosen, title.optString("original_language"))
+                || !title.optString("poster_path").matches("/[A-Za-z0-9]+[.](jpg|png|webp)")) return;
+        if (seen.add(kind + ":" + title.getInt("id"))) out.add(title.put("_kind", kind));
     }
 
     static String releasePath(String kind,String since,String until,String common,boolean english) {
@@ -468,30 +874,48 @@ final class Trending {
         }
     }
 
-    /** Backdrops and posters for the chosen picks, several at a time; a pick whose backdrop fails is dropped. */
-    private List<Pick> downloadImages(List<Pick> picks) throws Exception {
-        Map<String,java.util.concurrent.Future<Boolean>> jobs = new java.util.LinkedHashMap<>();
+    /** Download each unique image once, including posters shared by the global and per-app rows. */
+    private List<Pick> downloadImages(List<Pick> picks) throws InterruptedException {
+        Map<File, java.util.concurrent.Future<?>> jobs = new LinkedHashMap<>();
         for (Pick p : picks) {
-            if(jobs.containsKey(p.image.getName()))continue;
-            jobs.put(p.image.getName(),net.submit(() -> {
-                if (!p.image.isFile()) download(BACKDROPS + p.backdropPath, p.image);
-                if (p.poster != null && !p.poster.isFile()) {
-                    try { download(POSTERS + p.posterPath, p.poster); } catch (IOException e) { p.poster = null; }
-                }
-                return true;
-            }));
+            String backdropBase = p.externalId.isEmpty() ? BACKDROPS : "";
+            String posterBase = p.externalId.isEmpty() ? POSTERS : "";
+            if (!java.util.Objects.equals(p.image,p.poster)) queueImage(jobs, p.image, backdropBase, p.backdropPath);
+            queueImage(jobs, p.poster, posterBase, p.posterPath);
         }
         List<Pick> out = new ArrayList<>();
-        for (int i = 0; i < picks.size(); i++) {
-            try {
-                Pick p=picks.get(i);jobs.get(p.image.getName()).get();
-                if(p.poster!=null&&!p.poster.isFile())p.poster=null;
+        for (Pick p : picks) {
+            if (p.sweep) {
+                imageReady(jobs, p.poster);
+                imageReady(jobs, p.image);
                 out.add(p);
-            } catch (java.util.concurrent.ExecutionException e) {
-                Log.w(TAG, "No backdrop for " + picks.get(i).title + ": " + e.getCause());
+                continue;
             }
+            if (!imageReady(jobs, p.poster)) p.poster = null;
+            if (!imageReady(jobs, p.image)) {
+                if (p.externalId.isEmpty() || p.poster == null) continue;
+                p.image = p.poster;
+            }
+            out.add(p);
         }
         return out;
+    }
+
+    private void queueImage(Map<File, java.util.concurrent.Future<?>> jobs, File file, String base, String path) {
+        if (file == null || path == null || file.isFile()) return;
+        jobs.computeIfAbsent(file, ignored -> net.submit(() -> { download(base + path, file, base.isEmpty()); return null; }));
+    }
+
+    private static boolean imageReady(Map<File, java.util.concurrent.Future<?>> jobs, File file)
+            throws InterruptedException {
+        if (file == null) return false;
+        java.util.concurrent.Future<?> job = jobs.get(file);
+        try {
+            if (job != null) job.get();
+        } catch (java.util.concurrent.ExecutionException e) {
+            return false;
+        }
+        return file.isFile();
     }
 
     /** Films and series alternating, without repeats or titles that have no backdrop. */
@@ -617,6 +1041,7 @@ final class Trending {
         p.id = o.getInt("id");
         p.kind = kind;
         p.tab = tab;
+        p.market = region;
         p.lang = o.optString("original_language", "");
         p.title = o.optString(kind.equals("tv") ? "name" : "title", "");
         p.overview = o.optString("overview", "");
@@ -637,7 +1062,7 @@ final class Trending {
         p.meta = m.toString();
         // Pictures are downloaded once all picks are chosen (downloadImages), several at a time.
         p.image = new File(dir, kind + "_" + p.id + "_w1280.jpg");
-        p.backdropPath = o.getString("backdrop_path");
+        p.backdropPath = o.optString("backdrop_path", "");
         String posterPath = o.optString("poster_path", "");
         if (!posterPath.isEmpty() && !posterPath.equals("null")) {
             p.poster = new File(dir, kind + "_" + p.id + "_poster_w500.jpg");
@@ -684,9 +1109,6 @@ final class Trending {
         return n;
     }
 
-    /** How many streaming apps the last refresh found (-1: none yet), for the home screen's hint. */
-    int matchedApps() { return prefs.getInt("matched", -1); }
-
     private static String[] service(String providerName) {
         String n = providerName.toLowerCase(Locale.ROOT);
         for (String[] s : SERVICES) if (n.contains(s[0])) return s;
@@ -699,7 +1121,11 @@ final class Trending {
     }
 
     private void save(List<Pick> picks) throws Exception {
-        if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("Cannot create " + dir);
+        save(picks, dir);
+    }
+
+    private void save(List<Pick> picks, File cache) throws Exception {
+        if (!cache.isDirectory() && !cache.mkdirs()) throw new IOException("Cannot create " + cache);
         JSONArray a = new JSONArray();
         Set<String> keep = new HashSet<>();
         for (Pick p : picks) {
@@ -707,14 +1133,15 @@ final class Trending {
                     .put("pkg", p.pkg).put("service", p.service).put("lang", p.lang).put("meta", p.meta).put("image", p.image.getName())
                     .put("poster", p.poster == null ? "" : p.poster.getName()).put("uri", p.intentUri == null ? "" : p.intentUri)
                     .put("overview",p.overview).put("year",p.year).put("rating",p.rating)
-                    .put("release_date",p.releaseDate).put("weekly_trending",p.weeklyTrending));
+                    .put("external_id",p.externalId).put("cast",p.cast).put("rating_source",p.ratingSource)
+                    .put("release_date",p.releaseDate).put("weekly_trending",p.weeklyTrending).put("market",p.market).put("availability_verified",Recommendations.isAppRow(p.tab)));
             keep.add(p.image.getName());
             if (p.poster != null) keep.add(p.poster.getName());
         }
-        File tmp = new File(dir, "picks.json.tmp");
+        File tmp = new File(cache, "picks.json.tmp");
         try (OutputStream out = new FileOutputStream(tmp)) { out.write(a.toString().getBytes(StandardCharsets.UTF_8)); }
-        if (!tmp.renameTo(new File(dir, "picks.json"))) throw new IOException("Cannot save picks");
-        File[] files = dir.listFiles();
+        if (!tmp.renameTo(new File(cache, "picks.json"))) throw new IOException("Cannot save picks");
+        File[] files = cache.listFiles();
         if (files != null) for (File f : files) if (f.getName().endsWith(".jpg") && !keep.contains(f.getName())) f.delete();
     }
 
@@ -757,12 +1184,94 @@ final class Trending {
         }
     }
 
+    String titleEntity(Pick pick, int timeout) throws Exception {
+        String key = key();
+        if (key == null) throw new IOException("TMDB key not set");
+        return request(key, "/" + pick.kind + "/" + pick.id + "/external_ids", timeout, timeout)
+                .optString("wikidata_id", "");
+    }
+
+    private final android.util.LruCache<String, TitleMetadata> titleMetadata = new android.util.LruCache<>(48);
+
+    TitleMetadata details(Pick pick) throws Exception {
+        String key = key();
+        if (key == null) return null;
+        String kind = pick.kind;
+        int id = pick.id;
+        if (!TitleLinks.catalog(pick)) {
+            int verifiedSeries = TitleArtwork.verifiedSeries(pick, pick.image);
+            if (verifiedSeries > 0) {
+                kind = "tv";
+                id = verifiedSeries;
+            } else {
+                String query = URLEncoder.encode(TitleArtwork.queryTitle(pick.title), "UTF-8");
+                JSONObject results = request(key, "/search/multi?include_adult=false&query=" + query, 4000, 5000);
+                ContinueOptions.Episode episode = ContinueOptions.episode(pick);
+                String context = episode == null ? pick.meta : "Season " + episode.season;
+                JSONObject match = TitleArtwork.match(results.optJSONArray("results"), pick.title, context,
+                        pick.mediaKind, pick.releaseDate, path -> request(key, path, 4000, 5000));
+                if (match == null) return null;
+                kind = match.getString("media_type");
+                id = match.getInt("id");
+            }
+        }
+        String cacheKey = kind + ":" + id;
+        TitleMetadata cached = titleMetadata.get(cacheKey);
+        if (cached != null) return cached;
+        JSONObject details = request(key, "/" + kind + "/" + id + "?append_to_response=credits", 4000, 5000);
+        TitleMetadata result = new TitleMetadata(kind, details);
+        titleMetadata.put(cacheKey, result);
+        return result;
+    }
+
+    static final class TitleMetadata {
+        final String kind, year, genres, overview, cast;
+        final float rating;
+        private final Map<Integer, Integer> seasonSizes = new java.util.HashMap<>();
+
+        TitleMetadata(String kind, JSONObject details) {
+            this.kind = kind;
+            String date = details.optString("tv".equals(kind) ? "first_air_date" : "release_date");
+            year = date.length() >= 4 && date.substring(0, 4).matches("[0-9]{4}") ? date.substring(0, 4) : "";
+            overview = details.isNull("overview") ? "" : details.optString("overview");
+            rating = details.optInt("vote_count") > 0 ? (float) details.optDouble("vote_average", 0) : 0;
+            genres = names(details.optJSONArray("genres"), 2, " / ");
+            JSONObject credits = details.optJSONObject("credits");
+            cast = names(credits == null ? null : credits.optJSONArray("cast"), 4, ", ");
+            JSONArray seasons = details.optJSONArray("seasons");
+            for (int i = 0; "tv".equals(kind) && seasons != null && i < seasons.length(); i++) {
+                JSONObject season = seasons.optJSONObject(i);
+                if (season != null && season.optInt("season_number", -1) >= 0 && season.optInt("episode_count") > 0) {
+                    seasonSizes.put(season.optInt("season_number"), season.optInt("episode_count"));
+                }
+            }
+        }
+
+        int seasonSize(int season) { return seasonSizes.getOrDefault(season, 0); }
+
+        private static String names(JSONArray list, int limit, String separator) {
+            Set<String> names = new java.util.LinkedHashSet<>();
+            for (int i = 0; list != null && i < list.length() && names.size() < limit; i++) {
+                JSONObject entry = list.optJSONObject(i);
+                if (entry != null && !entry.isNull("name")) {
+                    String name = entry.optString("name").trim();
+                    if (!name.isEmpty()) names.add(name);
+                }
+            }
+            return String.join(separator, names);
+        }
+    }
+
     private static JSONObject request(String key,String path) throws Exception {
+        return request(key, path, 15_000, 20_000);
+    }
+
+    private static JSONObject request(String key, String path, int connectTimeout, int readTimeout) throws Exception {
         boolean bearer = key.length() > 40;
         String url = API + path + (bearer ? "" : (path.contains("?") ? "&" : "?") + "api_key=" + key);
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(15_000);
-        c.setReadTimeout(20_000);
+        c.setConnectTimeout(connectTimeout);
+        c.setReadTimeout(readTimeout);
         c.setRequestProperty("Accept", "application/json");
         if (bearer) c.setRequestProperty("Authorization", "Bearer " + key);
         try {
@@ -780,22 +1289,55 @@ final class Trending {
         // request skips the TLS handshake (each new one cost about a second on this TV).
     }
 
-    private static void download(String url, File to) throws IOException {
+    private static HttpURLConnection imageConnection(String url, boolean managed) throws IOException {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(15_000);
-        c.setReadTimeout(30_000);
+        c.setConnectTimeout(managed ? 5000 : 15_000);
+        c.setReadTimeout(managed ? 8000 : 30_000);
+        if (managed) c.setInstanceFollowRedirects(false);
+        return c;
+    }
+
+    private static void download(String url, File to, boolean managed) throws IOException {
+        File directory = to.getParentFile();
+        if (directory != null && !directory.isDirectory()
+                && !directory.mkdirs() && !directory.isDirectory()) {
+            throw new IOException("Cannot create title artwork cache");
+        }
+        HttpURLConnection c = imageConnection(url, managed);
+        if (managed) {
+            try {
+                if (c.getResponseCode() == 307) {
+                    String target = ManagedCatalog.posterRedirect(url, c.getHeaderField("Location"));
+                    if (target != null) {
+                        c.disconnect();
+                        c = imageConnection(target, true);
+                    }
+                }
+            } catch (IOException unavailable) {
+                c.disconnect();
+                throw unavailable;
+            }
+        }
         File tmp = new File(to.getPath() + ".part");
         try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(tmp)) {
+            if (managed && (c.getResponseCode() != 200 || c.getContentType() == null
+                    || !c.getContentType().startsWith("image/"))) throw new IOException("Managed image unavailable");
             byte[] b = new byte[16384];
-            for (int n; (n = in.read(b)) > 0; ) out.write(b, 0, n);
+            int total = 0;
+            for (int n; (n = in.read(b)) > 0; ) {
+                total += n;
+                if (managed && total > 12 * 1024 * 1024) throw new IOException("Managed image exceeds size limit");
+                out.write(b, 0, n);
+            }
         } catch (IOException e) {
             c.disconnect();
+            tmp.delete();
             throw e;
         }
         if (!tmp.renameTo(to)) throw new IOException("Cannot save " + to.getName());
     }
 
-    private static byte[] readAll(InputStream in) throws IOException {
+    static byte[] readAll(InputStream in) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         byte[] b = new byte[8192];
         for (int n; (n = in.read(b)) > 0; ) out.write(b, 0, n);

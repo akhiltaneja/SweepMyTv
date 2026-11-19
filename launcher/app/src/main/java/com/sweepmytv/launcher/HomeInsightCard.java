@@ -1,71 +1,101 @@
 package com.sweepmytv.launcher;
 
 import android.content.Context;
-import android.graphics.*;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.text.TextPaint;
-import android.text.TextUtils;
 import android.view.View;
-import java.util.*;
+import java.util.Locale;
 
-/** A small, readable header tile: one glanceable value, headline or calendar badge. */
+/** Content and sizing for a card in the rotating header. */
 final class HomeInsightCard extends View {
-    private final HomeInsights.Card card;private final float dp;private final int tint;
-    private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final TextPaint regularText=new TextPaint(Paint.ANTI_ALIAS_FLAG),strongText=new TextPaint(Paint.ANTI_ALIAS_FLAG);
-    private TextPaint text=regularText;
-    private final RectF bounds=new RectF(),badge=new RectF();private Shader fill;
-    private final String city,month,day,countdown,newsLabel;
-    private boolean highlighted;private int accent;
-    HomeInsightCard(Context context,HomeInsights.Card card,int tint){
-        super(context);this.card=card;this.tint=tint;dp=getResources().getDisplayMetrics().density;
-        Typeface font=getResources().getFont(R.font.outfit);regularText.setTypeface(font);regularText.setFontVariationSettings("'wght' 500");strongText.setTypeface(font);strongText.setFontVariationSettings("'wght' 650");
-        String[] source=card.body.split(" · ",2);newsLabel=source.length>1?source[1].toUpperCase(Locale.ROOT)+" · "+source[0].replace(" Tech","").replace(" Markets","").replace(" AI",""):"US TECH & MARKETS";
-        city=card.kicker.replace("AIR · ","").split(",",2)[0];countdown=card.foot.split(" · ",2)[0];
-        java.util.regex.Matcher date=java.util.regex.Pattern.compile(".*?([0-9]{1,2}) +([A-Za-z]+)").matcher(card.body);
-        if("festival".equals(card.kind)&&date.find()){day=date.group(1);String m=date.group(2);month=m.substring(0,Math.min(3,m.length())).toUpperCase(Locale.ROOT);}else{day="—";month="NEXT";}
-        setContentDescription(card.kicker+", "+card.metric+", "+card.body+", "+card.foot);
+    private final HomeInsights.Card card;
+    private final float dp;
+    private final HeaderWidgetStyle style;
+    private final String city, month, day, countdown, newsLabel;
+    private int primary, secondary;
+
+    HomeInsightCard(Context context, HomeInsights.Card card) {
+        super(context);
+        this.card = card;
+        style = new HeaderWidgetStyle(context);
+        dp = style.dp;
+        String[] source = card.body.split(" · ", 2);
+        newsLabel = source.length < 2 ? "AI, tech & markets"
+                : source[0].endsWith(" " + source[1]) ? source[0] : card.body;
+        city = card.kicker.replace("AIR · ", "").split(",", 2)[0];
+        countdown = card.foot.split(" · ", 2)[0];
+        java.util.regex.Matcher date = java.util.regex.Pattern.compile(".*?([0-9]{1,2}) +([A-Za-z]+)").matcher(card.body);
+        if ("festival".equals(card.kind) && date.find()) {
+            day = date.group(1);
+            String name = date.group(2);
+            month = name.substring(0, Math.min(3, name.length())).toUpperCase(Locale.ROOT);
+        } else {
+            day = "—";
+            month = "";
+        }
+        setContentDescription(card.kicker + ", " + card.metric + ", " + card.body
+                + (card.foot.isEmpty() ? "" : ", " + card.foot));
     }
-    void highlight(boolean on,int color){if(highlighted==on&&accent==color)return;highlighted=on;accent=color;invalidate();}
-    @Override protected void onSizeChanged(int w,int h,int ow,int oh){
-        bounds.set(dp/2,dp/2,w-dp/2,h-dp/2);int base=TimeOfDay.blend(tint,0xFF101725,.45f);
-        fill=new LinearGradient(0,0,0,h,new int[]{TimeOfDay.blend(base,0xFFFFFFFF,.035f),TimeOfDay.blend(base,0xFF0C1320,.16f)},null,Shader.TileMode.CLAMP);
+
+    void setColors(int primary, int secondary) {
+        if (this.primary == primary && this.secondary == secondary) return;
+        this.primary = primary;
+        this.secondary = secondary;
+        invalidate();
     }
-    @Override protected void onDraw(Canvas canvas){
-        paint.setShader(fill);canvas.drawRoundRect(bounds,10*dp,10*dp,paint);paint.setShader(null);
-        paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth((highlighted?1.7f:1f)*dp);paint.setColor(highlighted?accent:0x25FFFFFF);canvas.drawRoundRect(bounds,10*dp,10*dp,paint);paint.setStyle(Paint.Style.FILL);
-        float width=getWidth()/dp;
-        if("air".equals(card.kind)){
-            paint.setColor((card.color&0xFFFFFF)|0xA0000000);badge.set(0,8*dp,2*dp,24*dp);canvas.drawRoundRect(badge,dp,dp,paint);
-            line(canvas,card.metric,card.metric.length()>3?15:20,8,24,40,card.color,true);
-            line(canvas,city,6.5f,53,9,width-60,0xFFB4C0D3,true);
-            line(canvas,"US AQI",7,53,20,width-60,0xFFD4DCEB,true);
-            line(canvas,"estimate",6,53,28,width-60,0xFFA9B8CF,false);
-        }else if("news".equals(card.kind)){
-            newsBadge(canvas);
-            line(canvas,newsLabel,7,40,9,width-50,0xFFAEBFD9,true);
-            wrapped(canvas,card.metric,9.5f,40,20,width-50,2,0xFFF0F3FA);
-        }else{
-            paint.setColor(0x20E5C797);badge.set(8*dp,6*dp,32*dp,30*dp);canvas.drawRoundRect(badge,5*dp,5*dp,paint);
-            line(canvas,month,6,11,14,20,0xFFD7B889,true);
-            line(canvas,day,11,13,26,18,0xFFF0D9AF,true);
-            line(canvas,"NEXT FESTIVAL · "+countdown.toUpperCase(Locale.ROOT),7,40,11,width-50,0xFFD8C3A3,true);
-            line(canvas,card.metric,12,40,27,width-50,0xFFF0E0C8,true);
+
+    HomeInsights.Card value() {
+        return card;
+    }
+
+    int surfaceColor(int base) {
+        if (!"air".equals(card.kind) || "—".equals(card.metric)) return base;
+        return (base & 0xFF000000) | (TimeOfDay.blend(base, card.color, .16f) & 0x00FFFFFF);
+    }
+
+    @Override protected void onDraw(Canvas canvas) {
+        float width = getWidth() / dp;
+        int inset = HeaderWidgetStyle.PADDING;
+        int afterBadge = HeaderWidgetStyle.AFTER_BADGE;
+        float badgeTextWidth = width - afterBadge - inset;
+        switch (card.kind) {
+            case "air":
+                int accent = Color.luminance(primary) < .45f
+                        ? TimeOfDay.blend(card.color, primary, .65f) : card.color;
+                style.badge(canvas, accent);
+                style.badgeText(canvas, card.metric, card.metric.length() > 3 ? 10 : 14, 23, accent);
+                String status = card.foot.isEmpty() ? card.body : card.body + " · " + card.foot;
+                style.pair(canvas, "AQI · " + city, status, afterBadge, badgeTextWidth, primary, secondary);
+                break;
+            case "news":
+                headline(canvas, inset, width - 2 * inset);
+                break;
+            default:
+                style.badge(canvas, primary);
+                style.badgeText(canvas, month, 7, 15, secondary);
+                style.badgeText(canvas, day, 11, 26, primary);
+                String label = card.target > 0 ? "Next festival · " + countdown : "Local festivals";
+                style.pair(canvas, label, card.metric, afterBadge, badgeTextWidth, primary, secondary);
+                break;
         }
     }
-    private void newsBadge(Canvas c){
-        paint.setColor(0x2694A8DF);badge.set(8*dp,6*dp,32*dp,30*dp);c.drawRoundRect(badge,6*dp,6*dp,paint);
-        paint.setColor(0xFFBBCBEE);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.1f*dp);paint.setStrokeCap(Paint.Cap.ROUND);
-        badge.set(14*dp,12*dp,26*dp,24*dp);c.drawRoundRect(badge,2*dp,2*dp,paint);
-        c.drawLine(17*dp,15*dp,23*dp,15*dp,paint);c.drawLine(17*dp,18*dp,23*dp,18*dp,paint);c.drawLine(17*dp,21*dp,21*dp,21*dp,paint);paint.setStyle(Paint.Style.FILL);
-    }
-    private void line(Canvas c,String value,float size,float x,float y,float max,int color,boolean bold){text=bold?strongText:regularText;text.setTextSize(size*dp);text.setColor(color);c.drawText(TextUtils.ellipsize(value==null?"":value,text,Math.max(0,max)*dp,TextUtils.TruncateAt.END).toString(),x*dp,y*dp,text);}
-    private void wrapped(Canvas c,String value,float size,float x,float y,float max,int lines,int color){
-        String rest=value==null?"":value;text=regularText;text.setTextSize(size*dp);text.setColor(color);
-        for(int i=0;i<lines&&!rest.isEmpty();i++){
-            int n=text.breakText(rest,true,max*dp,null);if(n<=0)break;
-            if(i==lines-1){line(c,rest,size,x,y+i*(size+3),max,color,false);break;}
-            if(n<rest.length()){int space=rest.lastIndexOf(' ',n);if(space>0)n=space;}
-            c.drawText(rest.substring(0,n),x*dp,(y+i*(size+3))*dp,text);rest=rest.substring(n).trim();
+
+    private void headline(Canvas canvas, float x, float width) {
+        String title = card.metric;
+        float size = HeaderWidgetStyle.VALUE_SIZE;
+        TextPaint paint = style.paint(size, primary, true);
+        if (paint.measureText(title) <= width * dp) {
+            style.pair(canvas, newsLabel, title, x, width, primary, secondary);
+            return;
         }
+        style.line(canvas, newsLabel, x, 10, width, HeaderWidgetStyle.LABEL_SIZE, secondary, false);
+        size = 10;
+        paint = style.paint(size, primary, true);
+        int end = paint.breakText(title, true, Math.max(0, width) * dp, null);
+        int space = title.lastIndexOf(' ', end - 1);
+        if (space > 0) end = space;
+        style.line(canvas, title.substring(0, end), x, 21, width, size, primary, true);
+        style.line(canvas, title.substring(end).trim(), x, 32, width, size, primary, true);
     }
 }

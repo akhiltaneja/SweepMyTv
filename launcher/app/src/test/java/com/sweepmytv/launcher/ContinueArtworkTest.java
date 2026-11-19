@@ -48,6 +48,23 @@ public class ContinueArtworkTest {
         File tall=asset("provider-tall",800,1200,Color.MAGENTA);TitleArtwork.apply(c,p,tall,catalog);assertEquals(tall,p.poster);assertEquals(catalog.wide,p.image);
         Trending.Pick restored=pick();TitleArtwork.applyCached(c,restored);assertEquals(tall,restored.poster);assertEquals(catalog.wide,restored.image);assertEquals(2,catalog.calls);
     }
+    @Test public void failedWideDownloadKeepsThePosterAndRetriesTheOldPartialCache() throws Exception {
+        Trending.Pick pick = pick();
+        Catalog api = new Catalog();
+        api.wide = null;
+        String key = ArtworkAssets.hash(pick.pkg + "\n" + TitleArtwork.queryTitle(pick.title)
+                + "\n" + Locale.getDefault().getLanguage());
+        File index = new File(ArtworkAssets.dir(c), "catalog_" + key + ".json");
+        ArtworkAssets.write(index, new JSONObject().put("matching_version", 3)
+                .put("attempt", System.currentTimeMillis()));
+
+        TitleArtwork.Pair result = TitleArtwork.resolve(c,pick,api);
+        assertNull(result.landscape);
+        assertEquals(api.tall,result.portrait);
+        assertEquals(2,api.calls);
+        assertEquals(api.tall,TitleArtwork.resolve(c,pick,api).portrait);
+        assertEquals(2,api.calls);
+    }
     @Test public void galleryRankingChecksOrientationLanguageAndResolution()throws Exception{
         JSONArray wide=new JSONArray().put(image("/tiny.jpg",320,180,null)).put(image("/wrongorientation.jpg",1000,1500,null)).put(image("/french.jpg",3840,2160,"fr")).put(image("/hd.jpg",1280,720,null)).put(image("/uhd.jpg",3840,2160,null));
         assertEquals("/uhd.jpg",TitleArtwork.choose(wide,false,"en"));
@@ -149,4 +166,81 @@ public class ContinueArtworkTest {
         TitleArtwork.resolveRecent(c,Collections.singletonList(p),api);assertNull(p.image);assertEquals(poster,p.poster);
     }
 
+
+    @Test public void ambiguousSeriesMatchesCanBeResolvedByItsSeason() throws Exception {
+        org.json.JSONArray candidates = new org.json.JSONArray()
+                .put(new org.json.JSONObject().put("id", 1).put("name", "Modern Family").put("media_type", "tv"))
+                .put(new org.json.JSONObject().put("id", 2).put("name", "Modern Family").put("media_type", "tv"));
+        org.json.JSONObject match = TitleArtwork.match(candidates, "Modern Family", "Season 10",
+                path -> new org.json.JSONObject().put("number_of_seasons", path.endsWith("/1") ? 1 : 11));
+        assertEquals(2, match.getInt("id"));
+        assertNull(TitleArtwork.match(candidates, "Modern Family", "Season 10",
+                path -> new org.json.JSONObject().put("number_of_seasons", 11)));
+    }
+
+    @Test public void sonyLivDiscardsProviderStillsAndRestoresOnlyCatalogArt() throws Exception {
+        Catalog api = new Catalog();
+        File scene = asset("sony-playback-still", 1280, 720, Color.RED);
+        for (String pkg : Arrays.asList(Cricket.SONYLIV, "com.xiaomitv.sonyliv")) {
+            Trending.Pick p = pick();
+            p.pkg = pkg;
+            TitleArtwork.apply(c, p, scene, api);
+            assertEquals(api.wide, p.image);
+            assertEquals(api.tall, p.poster);
+            p.image = scene;
+            TitleArtwork.restoreCached(c, p, true);
+            assertEquals(api.wide, p.image);
+            assertEquals(api.tall, p.poster);
+        }
+    }
+
+    @Test public void providerDiscoverAcceptsPosterOnlyTitlesAndFiltersOriginalLanguages() throws Exception {
+        JSONObject film = new JSONObject().put("id", 1).put("title", "Drama")
+                .put("original_language", "hi").put("poster_path", "/Film.jpg");
+        JSONObject anime = new JSONObject().put("id", 1).put("name", "Anime")
+                .put("original_language", "ja").put("poster_path", "/Anime.jpg");
+        JSONObject sceneOnly = new JSONObject().put("id", 2).put("name", "Still")
+                .put("original_language", "ja").put("backdrop_path", "/Still.jpg");
+        JSONArray movies = new JSONArray().put(film);
+        JSONArray shows = new JSONArray().put(anime).put(sceneOnly).put(anime);
+        assertEquals(Arrays.asList(film, anime), Trending.appCandidates(movies, shows, Collections.emptySet()));
+        assertEquals(Collections.singletonList(anime), Trending.appCandidates(movies, shows, Collections.singleton("ja")));
+        assertEquals("tv", anime.getString("_kind"));
+    }
+
+    @Test public void availabilityRequiresTheSameAppRegionAndStreamingOffer() throws Exception {
+        JSONObject rental = new JSONObject().put("provider_id", 2);
+        JSONObject included = new JSONObject().put("provider_id", 350);
+        JSONObject market = new JSONObject().put("rent", new JSONArray().put(rental))
+                .put("flatrate", new JSONArray().put(included));
+        JSONObject response = new JSONObject().put("results", new JSONObject().put("IN", market));
+        assertFalse(Trending.availableInApp(response, "IN", Collections.singleton(2)));
+        assertFalse(Trending.availableInApp(response, "US", Collections.singleton(350)));
+        assertTrue(Trending.availableInApp(response, "IN", Collections.singleton(350)));
+    }
+
+    @Test public void verifiedGrandTourEditionKeepsPrimeBannerAndGetsMatchingPoster() throws Exception {
+        Trending.Pick p = pick();
+        p.pkg = Cricket.PRIME;
+        p.title = "The Grand Tour";
+        p.intentUri = "https://www.primevideo.com/detail/0HJALB095O1KZ90Z1DO6N7Q37P";
+        File provider = asset("new-cast", 1920, 1080, Color.BLUE);
+        File poster = asset("new-cast-poster", 600, 900, Color.YELLOW);
+        TitleArtwork.Catalog catalog = new TitleArtwork.Catalog() {
+            @Override public JSONObject get(String path) throws Exception {
+                if (path.startsWith("/tv/329471?")) return new JSONObject().put("id", 329471)
+                        .put("name", p.title).put("first_air_date", "2026-09-04")
+                        .put("external_ids", new JSONObject().put("imdb_id", "tt44974627"));
+                assertTrue(path.startsWith("/tv/329471/images?"));
+                return new JSONObject().put("posters", new JSONArray().put(ContinueArtworkTest.this.image("/GrandTour.jpg", 600, 900, "en")));
+            }
+            @Override public File image(String path) { return poster; }
+        };
+        TitleArtwork.apply(c, p, provider, catalog);
+        assertEquals(provider, p.image);
+        assertEquals(poster, p.poster);
+        p.intentUri = "https://www.primevideo.com/detail/0PQETKSPCYRRYT0IFUIS9G1CQ2";
+        assertEquals(0, TitleArtwork.verifiedSeries(p, provider));
+        assertNull(TitleArtwork.resolve(c, p, null).portrait);
+    }
 }

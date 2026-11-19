@@ -17,9 +17,9 @@ import java.util.Locale;
 import java.util.concurrent.Executor;
 
 /**
- * Talkies settings → Wallpaper → Bing picture of the day: the photo on Bing's home page, saved as files/bing.jpg and
+ * Sweep TV settings → Wallpaper → Bing picture of the day: the photo on Bing's home page, saved as files/bing.jpg and
  * fetched at most once every few hours while the home screen is in front. Off by default: it means asking Bing once a
- * day. Your own wallpaper.jpg wins over it. Bing allows its pictures as wallpaper only; Talkies skips a day whose
+ * day. Your own wallpaper.jpg wins over it. Bing allows its pictures as wallpaper only; Sweep TV skips a day whose
  * picture isn't. An idea from Plume (MIT).
  */
 final class Bing {
@@ -53,7 +53,9 @@ final class Bing {
 
     void refreshIfStale(Runnable changed) {
         long now = System.currentTimeMillis();
-        if (busy || now - prefs.getLong("checked", 0) < (prefs.getBoolean("failed", false) ? RETRY_MS : STALE_MS)) return;
+        boolean uhd = AerialQuality.hasUhdDisplay(c);
+        boolean sameDisplay = prefs.contains("requested_uhd") && prefs.getBoolean("requested_uhd", false) == uhd;
+        if (busy || sameDisplay && now - prefs.getLong("checked", 0) < (prefs.getBoolean("failed", false) ? RETRY_MS : STALE_MS)) return;
         busy = true;
         background.execute(() -> {
             boolean ok = false, fresh = false;
@@ -63,17 +65,35 @@ final class Bing {
                         .getJSONArray("images").getJSONObject(0);
                 String day = img.optString("startdate");
                 File f = file(c);
-                if (f != null && img.optBoolean("wp", true) && !(day.equals(prefs.getString("day", "")) && f.isFile())) {
+                if (f != null && img.optBoolean("wp", true) && !(sameDisplay && day.equals(prefs.getString("day", "")) && f.isFile())) {
                     File tmp = new File(f.getPath() + ".part");
-                    download("https://www.bing.com" + img.getString("urlbase") + "_1920x1080.jpg", tmp);
-                    fresh = tmp.renameTo(f);
+                    String source = "https://www.bing.com" + img.getString("urlbase");
+                    try {
+                        if (uhd) {
+                            try {
+                                download(source + "_UHD.jpg", tmp);
+                                android.graphics.BitmapFactory.Options info = new android.graphics.BitmapFactory.Options();
+                                info.inJustDecodeBounds = true;
+                                android.graphics.BitmapFactory.decodeFile(tmp.getPath(), info);
+                                if (info.outWidth < 3840 || info.outHeight < 2160) {
+                                    throw new java.io.IOException("Bing UHD rendition unavailable");
+                                }
+                            } catch (java.io.IOException unavailable) {
+                                download(source + "_1920x1080.jpg", tmp);
+                            }
+                        } else download(source + "_1920x1080.jpg", tmp);
+                        fresh = tmp.renameTo(f);
+                    } finally {
+                        tmp.delete();
+                    }
                     if (fresh) prefs.edit().putString("day", day).putString("caption", img.optString("copyright", null)).apply();
                 }
                 ok = true;
             } catch (Exception e) {
                 Log.w(TAG, "Couldn't get Bing's picture: " + e);
             }
-            prefs.edit().putLong("checked", System.currentTimeMillis()).putBoolean("failed", !ok).apply();
+            prefs.edit().putLong("checked", System.currentTimeMillis()).putBoolean("failed", !ok)
+                    .putBoolean("requested_uhd", uhd).apply();
             final boolean changedNow = fresh;
             new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
                 busy = false;

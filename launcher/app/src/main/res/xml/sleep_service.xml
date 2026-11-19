@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Standby for Turn off; typing a match into JioHotstar's search; keeping Talkies as the home screen while the
+<!-- Standby for Turn off; typing a match into JioHotstar's search; keeping Sweep TV as the home screen while the
      TV's own launcher stays enabled; the sleep warning; remote keys. It sees windows only of JioHotstar, the TV's
      built-in launchers and Google's Assistant: the packages below are a starting point, replaced at start with the
      launchers this TV actually has (SleepService.findStockHomes). -->

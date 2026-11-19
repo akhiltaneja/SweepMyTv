@@ -38,7 +38,7 @@ final class FormulaOne {
         String key, title = "", kicker = "", metric = "", foot = "", body = "";
         final List<String> lines = new ArrayList<>();
         long target;
-        boolean live;
+        boolean live, champion;
         final List<Line> table = new ArrayList<>();
     }
 
@@ -179,6 +179,7 @@ final class FormulaOne {
                     }
                     standings.body += line + " · " + entry.optString("wins") + " wins\n";
                 }
+                standings.champion = titleClinched(calendar, season, entries, drivers);
                 out.add(standings);
             }
             Card calendarCard = card("calendar", "Coming up", "UPCOMING GRANDS PRIX");
@@ -238,7 +239,7 @@ final class FormulaOne {
             c.metric = c.live ? "Session in progress" : "post".equals(value) ? "Completed"
                     : "in".equals(value) ? "Status needs refresh" : at > now ? countdown(at, now) : "Awaiting status";
             if (at > now && "pre".equals(value)) { c.target = at; c.kicker = "NEXT SESSION"; }
-            if (c.live) c.kicker = "LIVE SESSION · ESPN";
+            if (c.live) c.kicker = "LIVE SESSION";
             c.lines.add(local(at, zone));
             c.foot = stamp("status", "ESPN", now, zone, 2 * MINUTE);
             c.body = c.title + "\nStart: " + local(at, zone) + "\n" + c.metric
@@ -368,10 +369,36 @@ final class FormulaOne {
             Channels.Channel row = new Channels.Channel(); row.key = KEY; row.name = row.title = "Formula 1 · Race center";
             for (Card c : dashboard(now, zone)) {
                 Trending.Pick p = new Trending.Pick(); p.kind = KEY; p.tab = KEY; p.id = c.key.hashCode(); p.title = c.title;
-                p.meta = c.foot; p.extra = c; row.items.add(p);
+                p.meta = ""; p.extra = c; row.items.add(p);
             }
             return row;
         }
+    }
+
+    static boolean titleClinched(List<JSONObject> calendar, JSONObject standings, JSONArray entries, boolean drivers) {
+        if (standings == null || entries == null || entries.length() < 2 || calendar.isEmpty()) return false;
+        int year = standings.optInt("season", 0);
+        int completed = standings.optInt("round", 0);
+        if (year < 2025 || completed < 1) return false;
+        java.util.Set<Integer> rounds = new java.util.HashSet<>();
+        int remainingPoints = 0;
+        for (JSONObject race : calendar) {
+            int round = race.optInt("round", 0);
+            if (race.optInt("season", 0) != year || round < 1 || round > calendar.size() || !rounds.add(round)) {
+                return false;
+            }
+            if (round > completed) {
+                remainingPoints += drivers ? 25 : 43;
+                if (race.optJSONObject("Sprint") != null) remainingPoints += drivers ? 8 : 15;
+            }
+        }
+        if (!rounds.contains(completed)) return false;
+        JSONObject leader = entries.optJSONObject(0);
+        JSONObject rival = entries.optJSONObject(1);
+        if (leader == null || rival == null || leader.optInt("position") != 1 || rival.optInt("position") != 2) return false;
+        double first = leader.optDouble("points"), second = rival.optDouble("points");
+        // A strict lead avoids guessing how a points tie would be resolved.
+        return second >= 0 && first > second + remainingPoints;
     }
 
     static String duration(Object value) {

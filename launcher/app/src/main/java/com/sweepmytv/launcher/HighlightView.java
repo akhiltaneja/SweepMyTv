@@ -16,7 +16,7 @@ import android.view.View;
 public class HighlightView extends View {
     final RectF rect = new RectF();
     private float radius;
-    private boolean day, moving;
+    private boolean day, moving, compact;
     private int accent;
     private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG), edge = new Paint(Paint.ANTI_ALIAS_FLAG),
             halo = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -39,6 +39,7 @@ public class HighlightView extends View {
     }
 
     void setRing(RectF r, float radiusPx) {
+        if (rect.equals(r) && radius == radiusPx) return;
         rect.set(r);
         radius = radiusPx;
         invalidate();
@@ -50,9 +51,22 @@ public class HighlightView extends View {
 
     void setMoving(boolean m) { moving = m; invalidate(); }
 
+    void setCompact(boolean compact) {
+        if (this.compact == compact) return;
+        this.compact = compact;
+        invalidate();
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         if (rect.isEmpty()) return;
+        if (compact) {
+            ring.setStrokeWidth(2f * dp);
+            tmp.set(rect);
+            tmp.inset(-2f * dp, -2f * dp);
+            canvas.drawRoundRect(tmp, radius + 2f * dp, radius + 2f * dp, ring);
+            return;
+        }
         float w = (moving ? 5f : 4f) * dp;
         // The halo: thin bands side by side just outside the ring, each fainter than the last, so it fades out
         // smoothly over 12 dp (overlapping wide strokes showed as steps).

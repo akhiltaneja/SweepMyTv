@@ -7,9 +7,6 @@ import java.io.*;
 /** Bundled flat illustrations: DiceBear Thumbs (CC0) and Twemoji (CC BY 4.0). No runtime avatar service or generated AI artwork. */
 final class Avatars {
     static final int COUNT=36;
-    static final int[] GROUP_STARTS={12,24,0};
-    static final String[] GROUPS={"Animals","Little things","Simple faces"};
-    static final String[] GROUP_DETAILS={"Fox, panda, rabbit, penguin and more","Robots, space, sweets and other favourites","The original colourful characters"};
     private static final int[] DRAWABLES={R.drawable.avatar_fox,R.drawable.avatar_cat,R.drawable.avatar_panda,R.drawable.avatar_koala,R.drawable.avatar_rabbit,R.drawable.avatar_frog,R.drawable.avatar_penguin,R.drawable.avatar_dog,R.drawable.avatar_tiger,R.drawable.avatar_owl,R.drawable.avatar_bear,R.drawable.avatar_unicorn,R.drawable.avatar_robot,R.drawable.avatar_alien,R.drawable.avatar_ghost,R.drawable.avatar_rocket,R.drawable.avatar_star,R.drawable.avatar_planet,R.drawable.avatar_sun,R.drawable.avatar_moon,R.drawable.avatar_cupcake,R.drawable.avatar_rainbow,R.drawable.avatar_avocado,R.drawable.avatar_strawberry};
     static final String[] NAMES={"Mango","Peach","Mint","Berry","Sunny","Sky","Cocoa","Lilac","Coral","Lime","Ocean","Rose","Fox","Cat","Panda","Koala","Rabbit","Frog","Penguin","Dog","Tiger","Owl","Bear","Unicorn","Robot","Alien","Ghost","Rocket","Star","Planet","Sun","Moon","Cupcake","Rainbow","Avocado","Strawberry"};
     private static final android.util.LruCache<String,Bitmap> cache=new android.util.LruCache<>(14);
@@ -28,7 +25,12 @@ final class Avatars {
         BitmapFactory.Options opts=new BitmapFactory.Options();opts.inSampleSize=4;Bitmap b=BitmapFactory.decodeFile(Profiles.photo(c,id).getPath(),opts);if(b!=null)cache.put(key,b);return b;
     }
     static android.graphics.drawable.Drawable drawable(Context c,int size){
-        Bitmap b=active(c);if(b==null)return null;
+        return drawable(c, Profiles.active(c), size);
+    }
+    static android.graphics.drawable.Drawable drawable(Context c,String id,int size){
+        int avatar = Profiles.avatar(c, id);
+        Bitmap b = avatar < 0 ? photo(c, id) : preset(c, avatar);
+        if(b==null)return null;
         android.graphics.drawable.Drawable d=new android.graphics.drawable.Drawable(){
             final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
             public void draw(Canvas canvas){Rect r=getBounds();int save=canvas.save();Path clip=new Path();clip.addCircle(r.exactCenterX(),r.exactCenterY(),r.width()/2f,Path.Direction.CW);canvas.clipPath(clip);canvas.drawBitmap(b,null,r,paint);canvas.restoreToCount(save);}

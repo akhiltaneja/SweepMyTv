@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import MagicMock, patch
+from urllib.error import HTTPError
 
 spec = importlib.util.spec_from_file_location('upstream_gate', Path(__file__).parents[1] / 'check-upstream.py')
 gate = importlib.util.module_from_spec(spec)
@@ -56,6 +58,25 @@ class UpstreamGateTest(unittest.TestCase):
         self.commit = 'b' * 40
         with self.assertRaisesRegex(ValueError, 'verified commit'):
             gate.verify(self.root, self.lock, self.fetch)
+
+    def test_rate_limited_api_checks_the_live_release_tag_and_pinned_source(self):
+        def limited(url):
+            if url.endswith('/releases/latest'):
+                raise HTTPError(url, 403, 'rate limit exceeded', {'X-RateLimit-Remaining': '0'}, None)
+            return self.fetch(url)
+
+        response = MagicMock()
+        response.__enter__.return_value.geturl.return_value = self.release['html_url']
+        ref = 'refs/tags/' + self.lock['release']
+        refs = f"{'b' * 40}\t{ref}\n{self.commit}\t{ref}^{{}}\n"
+        with patch.object(gate, 'urlopen', return_value=response), patch.object(gate.subprocess, 'check_output', return_value=refs):
+            self.assertTrue(gate.verify(self.root, self.lock, limited)['latest_verified'])
+            self.upstream = b'changed upstream source'
+            with self.assertRaisesRegex(ValueError, 'differs'):
+                gate.verify(self.root, self.lock, limited)
+            response.__enter__.return_value.geturl.return_value = gate.PROJECT + '/releases/tag/v3.5.0'
+            with self.assertRaisesRegex(ValueError, 'needs review'):
+                gate.verify(self.root, self.lock, limited)
 
     def test_changed_upstream_source_is_rejected(self):
         self.upstream = b'new behavior requiring review'

@@ -1,5 +1,7 @@
 # Third-party notices
 
+Parts of the title row and media-session listener include code from [Talkies by Raju / TechPP](https://github.com/rajupp/talkies), under the MIT license. The accompanying LICENSE contains the original copyright and license text.
+
 The Control Center (`Sleep.java`, `SleepService.java`, `res/xml/sleep_service.xml`, `res/drawable/ic_cc.xml` and the Control Center code in `HomeActivity.java`) is adapted from
 tv-vibehack's launcher, branch `pr/control-center` (https://github.com/samdegan2311/tv-vibehack/tree/pr/control-center), under this license:
 
@@ -192,3 +194,7 @@ License: https://creativecommons.org/licenses/by/4.0/
 Full license text: TWEMOJI-CC-BY-4.0.txt in the bundled licences.
 Pinned source revision: b6b55fef1e8636b540a6d016a4729ca8cdf2e60b
 The 24 SVG illustrations were converted to native Android vector drawables and adapted with coloured circular backgrounds, padding and scaling. Character shapes and colours are preserved. Source filenames: 1f98a.svg, 1f431.svg, 1f43c.svg, 1f428.svg, 1f430.svg, 1f438.svg, 1f427.svg, 1f436.svg, 1f42f.svg, 1f989.svg, 1f43b.svg, 1f984.svg, 1f916.svg, 1f47d.svg, 1f47b.svg, 1f680.svg, 1f31f.svg, 1fa90.svg, 1f31e.svg, 1f31b.svg, 1f9c1.svg, 1f308.svg, 1f951.svg, 1f353.svg.
+
+## Market widget artwork
+
+Most asset icons were sourced from the TradingView symbol-logo CDN. The SBI badge and the generic bank icon for Nifty Bank are local vectors. Company and index marks identify their respective listings and belong to their owners.

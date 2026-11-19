@@ -69,7 +69,7 @@ final class Weather {
         long now = System.currentTimeMillis();
         // Running set-location.sh again (even with the same place) rewrites the file: fetch right away.
         long stamp = new File(ctx.getExternalFilesDir(null), "location.txt").lastModified();
-        String config=area+"|"+stamp+"|"+unit()+"|sky1";
+        String config=area+"|"+stamp+"|"+unit()+"|sky2";
         boolean changed=!config.equals(prefs.getString("request_config",null));
         if (!changed && (now - prefs.getLong("ok_at", 0) < REFRESH_MS || now - prefs.getLong("try_at", 0) < RETRY_MS)) return;
         prefs.edit().putLong("file_at",stamp).putString("request_config",config).putLong("try_at", now).apply();
@@ -100,8 +100,8 @@ final class Weather {
     }
 
     private String automaticArea(){return automatic()?"@auto":null;}
+    /** Honor a saved opt-out from versions that offered an Automatic city switch. */
     boolean automatic(){return ctx.getSharedPreferences("home",Context.MODE_PRIVATE).getBoolean("automatic_city",true);}
-    void automatic(boolean enabled){ctx.getSharedPreferences("home",Context.MODE_PRIVATE).edit().putBoolean("automatic_city",enabled).apply();}
     String locationLabel() {
         String manual=Keys.read(ctx,Keys.LOCATION);if(manual!=null)return manual.matches("[-+0-9.,\\s]+")?"Coordinates":manual;
         return automatic()?"Auto · "+prefs.getString("auto_city","approximate IP city"):"Off";
@@ -220,10 +220,20 @@ final class Weather {
         java.text.DateFormat hour = android.text.format.DateFormat.is24HourFormat(ctx)
                 ? new java.text.SimpleDateFormat("HH:mm", Locale.getDefault()) : new java.text.SimpleDateFormat("h a", Locale.getDefault());
         long now = System.currentTimeMillis();
+        java.time.ZoneId zone = java.util.TimeZone.getTimeZone(prefs.getString("forecast_zone",
+                java.time.ZoneId.systemDefault().getId())).toZoneId();
+        java.time.LocalDate today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate();
         for (String row : prefs.getString(days ? "days" : "hours", "").split("\n")) {
             String[] f = row.split("\t");
             if (f.length != 2) continue;
-            if (!days) {
+            if (days) {
+                java.time.LocalDate date;
+                try { date = java.time.LocalDate.parse(f[0]); }
+                catch (java.time.format.DateTimeParseException oldCache) { continue; }
+                if (date.isBefore(today)) continue;
+                f[0] = date.equals(today) ? "Today" : date.equals(today.plusDays(1)) ? "Tomorrow"
+                        : date.format(java.time.format.DateTimeFormatter.ofPattern("EEE, d MMM", Locale.getDefault()));
+            } else {
                 // Hours are kept as their start time: one that has begun is no longer "next".
                 long at;
                 try { at = Long.parseLong(f[0]); } catch (NumberFormatException e) { continue; }
@@ -240,10 +250,8 @@ final class Weather {
     private void saveForecast(JSONObject forecast) {
         StringBuilder hours = new StringBuilder(), days = new StringBuilder();
         try {
-            java.text.SimpleDateFormat in = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US),
-                    day = new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US);
-            in.setTimeZone(java.util.TimeZone.getTimeZone(forecast.optString("timezone", "UTC")));  // the place's local times
-            java.text.DateFormat weekday = new java.text.SimpleDateFormat("EEEE", Locale.getDefault());
+            java.text.SimpleDateFormat in = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US);
+            in.setTimeZone(java.util.TimeZone.getTimeZone(forecast.optString("timezone", "UTC")));
             JSONObject h = forecast.getJSONObject("hourly");
             JSONArray t = h.getJSONArray("time"), temp = h.getJSONArray("temperature_2m"), code = h.getJSONArray("weather_code"),
                     isDay = h.getJSONArray("is_day");
@@ -255,14 +263,14 @@ final class Weather {
             JSONArray dt = d.getJSONArray("time"), max = d.getJSONArray("temperature_2m_max"), min = d.getJSONArray("temperature_2m_min"),
                     dc = d.getJSONArray("weather_code");
             for (int i = 0; i < dt.length(); i++) {
-                String when = i == 0 ? "Today" : i == 1 ? "Tomorrow" : weekday.format(day.parse(dt.getString(i)));
-                days.append(when).append('\t').append(degrees(max.getDouble(i))).append(" / ").append(degrees(min.getDouble(i)))
+                days.append(dt.getString(i)).append('\t').append(degrees(max.getDouble(i))).append(" / ").append(degrees(min.getDouble(i)))
                         .append("  ").append(wmoCondition(dc.getInt(i), true)).append('\n');
             }
         } catch (Exception e) {
             Log.w(TAG, "No forecast: " + e);
         }
-        prefs.edit().putString("hours", hours.toString()).putString("days", days.toString()).putBoolean("hours_at", true).apply();
+        prefs.edit().putString("hours", hours.toString()).putString("days", days.toString())
+                .putString("forecast_zone", forecast.optString("timezone", "UTC")).putBoolean("hours_at", true).apply();
     }
 
     /** "31°", in Fahrenheit where that's the custom. */

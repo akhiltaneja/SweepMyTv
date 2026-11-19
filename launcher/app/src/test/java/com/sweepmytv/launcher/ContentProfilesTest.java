@@ -17,19 +17,20 @@ public class ContentProfilesTest {
         List<Trending.Pick> all=new ArrayList<>();for(String language:new String[]{"en","hi","ta","","en"}){Trending.Pick p=new Trending.Pick();p.lang=language;all.add(p);}
         assertEquals(2,ContentLanguages.filter(all,Set.of("en")).size());assertEquals(1,ContentLanguages.filter(all,Set.of("hi")).size());assertEquals(3,ContentLanguages.filter(all,Set.of("en","hi")).size());assertEquals(5,ContentLanguages.filter(all,Collections.emptySet()).size());
     }
-    @Test public void providerRecommendationsAreFilteredWithoutChangingHistoryOrSavedRows(){
+    @Test public void providerRecommendationsAreFilteredWithoutChangingSavedRows(){
         Channels.Channel app=new Channels.Channel();app.key="provider";for(String lang:new String[]{"en","hi",""}){Trending.Pick p=new Trending.Pick();p.lang=lang;app.items.add(p);}
-        Channels.Channel history=new Channels.Channel();history.key=Channels.WATCH_NEXT;history.items.addAll(app.items);
-        List<Channels.Channel> filtered=ContentLanguages.channels(Arrays.asList(app,history),Set.of("hi"));
-        assertEquals(2,filtered.size());assertEquals(1,filtered.get(0).items.size());assertEquals("hi",filtered.get(0).items.get(0).lang);assertEquals(3,filtered.get(1).items.size());assertEquals(3,app.items.size());
-        assertEquals(1,ContentLanguages.channels(Arrays.asList(app,history),Set.of("ta")).size());
+        List<Channels.Channel> filtered=ContentLanguages.channels(List.of(app),Set.of("hi"));
+        assertEquals(1,filtered.size());assertEquals(1,filtered.get(0).items.size());assertEquals("hi",filtered.get(0).items.get(0).lang);assertEquals(3,app.items.size());
+        assertTrue(ContentLanguages.channels(List.of(app),Set.of("ta")).isEmpty());
     }
     @Test public void weeklyTrendingHonoursHindiAndMixedSelections() throws Exception {
         JSONArray movies=new JSONArray();for(int i=0;i<3;i++)movies.put(new JSONObject().put("id",i+1).put("original_language",new String[]{"en","hi","ta"}[i]).put("backdrop_path","/x.jpg"));
         assertEquals("hi",Trending.weeklyInLanguages(movies,new JSONArray(),Set.of("hi")).get(0).getString("original_language"));assertEquals(2,Trending.weeklyInLanguages(movies,new JSONArray(),Set.of("en","ta")).size());
     }
     @Test public void cacheImmediatelyHonoursSelectionWithoutAnotherNetworkRefresh() throws Exception {
+        org.junit.Assume.assumeTrue(BuildConfig.CATALOG_COMPARISON);
         Context c=RuntimeEnvironment.getApplication();Keys.write(c,Keys.TMDB,"fixture-not-a-real-key");
+        Keys.setCatalogEngine(c, "tmdb");
         android.content.pm.PackageInfo info=new android.content.pm.PackageInfo();info.packageName="fixture.provider";Shadows.shadowOf(c.getPackageManager()).installPackage(info);
         File dir=new File(c.getExternalFilesDir(null),"trending");dir.mkdirs();new File(dir,"art.jpg").createNewFile();JSONArray picks=new JSONArray();
         for(String lang:new String[]{"en","hi","ta",""})picks.put(new JSONObject().put("id",picks.length()+1).put("kind","movie").put("title","Fixture").put("pkg",info.packageName).put("service","Fixture").put("image","art.jpg").put("lang",lang));

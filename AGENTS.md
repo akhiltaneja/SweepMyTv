@@ -2,6 +2,9 @@
 
 - Before preparing an update for the TV, check the latest stable CleanYourTV
   release and compare it with `launcher/upstream/cleanyourtv-lock.json`.
+- Before each TV release, also check the latest stable Talkies release and review
+  compatible fixes against the Sweep TV adaptations. Record the source commit and
+  scope in `launcher/UPSTREAM_UPDATES.md`.
 - The user authorizes compatible maintenance updates after source review and
   verification. Port applicable changes into Sweep TV; preserve its existing UI,
   profiles, artwork choices and settings. Do not replace it with the stock
@@ -20,6 +23,14 @@
 - Ask before applying cleanup rules, changing disabled packages, granting new
   permissions, or changing TV services or remote mappings. The physical volume
   hold investigation remains paused. A newer device profile alone is not approval.
+- Before asking if the Redmi is reachable or requesting its IP, run
+  `python3 launcher/check-tv.py`. It discovers the TV by its configured serial,
+  reconnects to its advertised ADB address, and checks its foreground state.
+  Use the verified address it returns for TV commands.
+- For an authorized update, use `python3 launcher/check-tv.py --wake-idle`
+  if Android reports an idle screen saver. The checker uses Android's wake key
+  after checking playback and verifies the foreground again. Continue when
+  `ready_for_update` is true.
 - Test requested launcher updates on the actual TV. Check the current foreground
   app first and avoid interrupting playback without a ready/approval response.
   Verify package state, accessibility, existing grants and the TMDB key survive

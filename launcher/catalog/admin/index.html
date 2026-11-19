@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sweep TV Catalog Admin</title>
+  <link rel="stylesheet" href="/admin.css">
+  <script src="/admin.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="wordmark"><span class="logo" aria-hidden="true"><i></i><i></i><i></i></span><span>Sweep TV<small>Catalog Admin</small></span></div>
+    <nav aria-label="Dashboard">
+      <a href="#catalog" data-view="catalog" aria-current="page"><span aria-hidden="true">▤</span> Catalog</a>
+      <a href="#trending" data-view="trending"><span aria-hidden="true">↗</span> Trending</a>
+      <a href="#recent" data-view="recent"><span aria-hidden="true">◷</span> Recently Released</a>
+      <a href="#tmdb" data-view="tmdb"><span aria-hidden="true">⌕</span> TMDB index</a>
+      <a href="#runs" data-view="runs"><span aria-hidden="true">◷</span> Refresh history</a>
+      <a href="#issues" data-view="issues"><span aria-hidden="true">!</span> Listing issues</a>
+      <a href="#feed" data-view="feed"><span aria-hidden="true">⇩</span> TV feed</a>
+    </nav>
+    <div class="sidebar-foot"><span class="status-dot"></span> Local workspace</div>
+  </aside>
+  <main>
+    <header class="topbar"><span>Catalog workspace <span class="slash">/</span> <span id="breadcrumb">Catalog</span></span><button id="reload" class="secondary">Refresh view</button></header>
+    <p id="notice" class="notice" role="status" hidden></p>
+    <section id="catalog" class="view">
+      <header class="page-heading"><div><h1 id="workspace-title">India catalog</h1><p id="catalog-caption">Loading the current TV feed…</p></div><a id="catalog-index-link" class="market catalog-index-link" href="#tmdb">Search TMDB index <span aria-hidden="true">↗</span></a></header>
+      <div class="metrics" id="metrics" aria-label="Catalog totals"></div>
+      <section id="coverage-panel" class="coverage" aria-labelledby="coverage-heading">
+        <header><h2 id="coverage-heading">English coverage</h2><p id="target-caption"></p></header>
+        <div id="coverage" class="coverage-grid"></div>
+      </section>
+      <section class="library" aria-labelledby="library-heading">
+        <div class="library-header"><h2 id="library-heading">Titles</h2><span id="result-count" aria-live="polite"></span></div>
+        <div class="filters">
+          <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search titles or IMDb IDs" aria-label="Search titles or IMDb IDs"></label>
+          <select id="provider" aria-label="Streaming app"><option value="">All apps</option></select>
+          <select id="language" aria-label="Original language"><option value="">All languages</option></select>
+          <select id="row" aria-label="Home section"><option value="">All sections</option><option value="trending">Trending</option><option value="new">Recently Released</option><option value="provider">App recommendations</option></select>
+          <select id="link" aria-label="Title link status"><option value="">All links</option><option value="linked">Title link available</option><option value="unlinked">Missing title link</option></select>
+          <select id="feed-inclusion" aria-label="TV feed inclusion"><option value="">Entire catalog</option><option value="included">In the TV feed</option><option value="eligible">Eligible for recommendations</option><option value="excluded">Catalog only</option><option value="hidden">Hidden by you</option></select>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th scope="col">Title</th><th scope="col">App</th><th scope="col">Language</th><th scope="col">Section</th><th scope="col">Rating</th><th scope="col">Title link</th></tr></thead><tbody id="titles"></tbody></table></div>
+        <div class="pagination"><span id="page-status"></span><div><button id="previous" class="secondary" aria-label="Previous page">Previous</button><button id="next" class="secondary" aria-label="Next page">Next</button></div></div>
+      </section>
+    </section>
+    <section id="tmdb" class="view" hidden>
+      <header class="page-heading"><div><h1>TMDB title index</h1><p id="tmdb-caption">Loading the private index…</p></div></header>
+      <div id="tmdb-metrics" class="metrics" aria-label="TMDB index totals"></div>
+      <section class="library" aria-labelledby="tmdb-heading">
+        <div class="library-header"><h2 id="tmdb-heading">Titles</h2><span id="tmdb-count" aria-live="polite"></span></div>
+        <form id="tmdb-search-form" class="filters" role="search">
+          <label class="search"><span aria-hidden="true">⌕</span><input id="tmdb-query" type="search" maxlength="120" placeholder="Search original titles or TMDB IDs" aria-label="Search original titles or TMDB IDs"></label>
+          <select id="tmdb-kind" aria-label="Title type"><option value="">Movies and TV</option><option value="movie">Movies</option><option value="tv">TV series</option></select>
+          <button type="submit" class="secondary">Search</button>
+        </form>
+        <div class="table-wrap"><table><thead><tr><th scope="col">Original title</th><th scope="col">Type</th><th scope="col">TMDB ID</th><th scope="col">Popularity</th></tr></thead><tbody id="tmdb-results"></tbody></table></div>
+      </section>
+      <p class="source-note">Source <a href="https://developer.themoviedb.org/docs/daily-id-exports" target="_blank" rel="noopener noreferrer">TMDB daily exports</a>. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+    </section>
+    <section id="runs" class="view" hidden>
+      <header class="page-heading"><div><h1>Refresh history</h1><p id="schedule"></p></div></header>
+      <section class="library"><div class="table-wrap"><table><thead><tr><th scope="col">Started</th><th scope="col">Source</th><th scope="col">Status</th><th scope="col">Entries</th><th scope="col">Result</th></tr></thead><tbody id="run-rows"></tbody></table></div></section>
+    </section>
+    <section id="issues" class="view" hidden>
+      <header class="section-head"><h2>Listing issues</h2><p>Listings with unresolved issues are withheld from the TV feed and checked on each refresh.</p></header>
+      <section class="library"><div class="table-wrap"><table><thead><tr><th scope="col">Title</th><th scope="col">App</th><th scope="col">Issue</th><th scope="col">First seen</th><th scope="col">Last checked</th><th scope="col">Status</th></tr></thead><tbody id="issue-rows"></tbody></table></div></section>
+    </section>
+    <section id="feed" class="view" hidden>
+      <header class="page-heading"><div><h1>TV feed</h1><p>The titles selected from the India catalog for Sweep TV.</p></div></header>
+      <section class="feed-panel"><h2>IN.json</h2><dl id="feed-details" class="details-grid"></dl><a class="primary" href="/catalog/IN.json" download="IN.json">Download feed</a></section>
+    </section>
+  </main>
+  <dialog id="detail" aria-labelledby="detail-title"><button id="close-detail" class="secondary close-detail" aria-label="Close title details">Close</button><div id="detail-content"></div></dialog>
+</body>
+</html>

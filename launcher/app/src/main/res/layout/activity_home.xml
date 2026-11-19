@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Talkies. 960 × 540 dp. The page holds everything that scrolls: header, picks, dock, then All apps below the
+<!-- Sweep TV. 960 × 540 dp. The page holds everything that scrolls: header, picks, dock, then All apps below the
      fold. Colours are applied in code for the day or night theme. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
@@ -17,55 +17,36 @@
         android:clipChildren="false"
         android:clipToPadding="false">
 
-        <!-- Under the clock: the picks' tabs (the title is no longer shown; kept for the theme code) -->
+        <!-- A separate navigation row between the clock and the content shelf. -->
         <LinearLayout
             android:id="@+id/for_you_head"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="40dp"
-            android:layout_marginTop="98dp"
+            android:layout_marginTop="112dp"
             android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/outfit"
-                android:includeFontPadding="false"
-                android:letterSpacing="-0.015"
-                android:text="For You"
-                android:textSize="38sp"
-                android:visibility="gone" />
 
             <LinearLayout
                 android:id="@+id/tabs"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="-12dp"
+                android:padding="3dp"
                 android:orientation="horizontal">
                 <TextView android:id="@+id/tab_recent" style="@style/TabText" android:text="Continue" />
-                <TextView android:id="@+id/tab_trending" style="@style/TabText" android:layout_marginStart="2dp" android:text="Trending" />
-                <TextView android:id="@+id/tab_india" style="@style/TabText" android:layout_marginStart="2dp" android:text="New in India" />
+                <TextView android:id="@+id/tab_trending" style="@style/TabText" android:text="Trending" />
+                <TextView android:id="@+id/tab_india" style="@style/TabText" android:text="New in India" />
             </LinearLayout>
 
-            <!-- Only while there are no picks to show: why (no TMDB key yet, or offline) -->
-            <TextView
-                android:id="@+id/picks_hint"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="40dp"
-                android:fontFamily="@font/outfit"
-                android:textSize="15sp"
-                android:visibility="gone" />
         </LinearLayout>
 
-        <!-- Header, right: icon buttons, then time · date · weather -->
+        <!-- Header, right: widgets and TV controls. -->
         <LinearLayout
+            android:id="@+id/header_controls"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end|top"
             android:layout_marginTop="24dp"
-            android:layout_marginEnd="40dp"
+            android:layout_marginEnd="24dp"
             android:clipChildren="false"
             android:clipToPadding="false"
             android:gravity="end"
@@ -78,70 +59,45 @@
                 android:clipChildren="false"
                 android:clipToPadding="false"
                 android:orientation="horizontal">
-                <!-- A single rotating glance tile, aligned with the Settings controls. -->
                 <FrameLayout android:id="@+id/top_insights"
                     android:layout_width="196dp" android:layout_height="36dp"
+                    android:layout_gravity="center_vertical" android:layout_marginEnd="6dp"
+                    android:visibility="gone">
+                    <com.sweepmytv.launcher.Meters android:id="@+id/meters"
+                        android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:importantForAccessibility="yes" />
+                </FrameLayout>
+                <com.sweepmytv.launcher.MarketCard android:id="@+id/market_card"
+                    android:layout_width="133dp" android:layout_height="36dp"
+                    android:layout_gravity="center_vertical" android:layout_marginEnd="6dp"
+                    android:importantForAccessibility="yes" android:visibility="gone" />
+                <FrameLayout android:id="@+id/top_air"
+                    android:layout_width="140dp" android:layout_height="36dp"
                     android:layout_gravity="center_vertical" android:layout_marginEnd="4dp"
-                    android:clipChildren="false" android:clipToPadding="false"
                     android:visibility="gone" />
-                <ImageView android:id="@+id/icon_cc" style="@style/IconButton" android:src="@drawable/ic_cc" android:contentDescription="Control Center" />
-                <ImageView android:id="@+id/icon_inputs" style="@style/IconButton" android:src="@drawable/ic_input" android:contentDescription="Inputs" />
-                <ImageView android:id="@+id/icon_wifi" style="@style/IconButton" android:src="@drawable/ic_wifi" android:contentDescription="Wi-Fi" />
-                <ImageView android:id="@+id/icon_settings" style="@style/IconButton" android:src="@drawable/ic_settings" android:contentDescription="Settings" />
+                <ImageView android:id="@+id/icon_cc" style="@style/IconButton" android:src="@drawable/ic_sweep_controls" android:importantForAccessibility="no" android:visibility="gone" />
+                <ImageView android:id="@+id/icon_inputs" style="@style/IconButton" android:src="@drawable/ic_sweep_inputs" android:contentDescription="Inputs" />
+                <ImageView android:id="@+id/icon_wifi" style="@style/IconButton" android:src="@drawable/ic_sweep_wifi" android:contentDescription="Wi-Fi" />
+                <ImageView android:id="@+id/icon_settings" style="@style/IconButton" android:src="@drawable/ic_sweep_settings" android:contentDescription="Settings" />
                 <!-- Shown only while the Play Store has updates waiting -->
                 <ImageView android:id="@+id/icon_bell" style="@style/IconButton" android:src="@drawable/ic_bell" android:contentDescription="App updates" android:visibility="gone" />
             </LinearLayout>
-            <com.sweepmytv.launcher.Meters android:id="@+id/meters" android:layout_width="wrap_content"
-                android:layout_height="18dp" android:layout_marginTop="6dp" android:layout_gravity="end"
-                android:importantForAccessibility="yes" />
-
-            <TextView
-                android:id="@+id/info"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="9dp"
-                android:fontFamily="@font/outfit"
-                android:singleLine="true"
-                android:textSize="13sp" />
         </LinearLayout>
 
-        <!-- Cricket: the most relevant live (or today's) match, under the time and weather -->
-        <TextView
-            android:id="@+id/score"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="end|top"
-            android:layout_marginTop="72dp"
-            android:layout_marginEnd="40dp"
-            android:fontFamily="@font/outfit"
-            android:singleLine="true"
-            android:textSize="13sp"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/credit"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="end|top"
-            android:layout_marginTop="106dp"
-            android:layout_marginEnd="40dp"
-            android:fontFamily="@font/outfit"
-            android:text="Picks from TMDB"
-            android:textSize="11sp" />
-
-        <!-- Weather, then time | date, top left. -->
+        <!-- Greeting, followed by the clock and a quiet date label. -->
         <LinearLayout
             android:id="@+id/big_clock"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="40dp"
-            android:layout_marginTop="26dp"
+            android:layout_marginTop="24dp"
             android:orientation="vertical"
             >
             <TextView
                 android:id="@+id/big_weather"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:ellipsize="end"
                 android:fontFamily="@font/outfit"
                 android:letterSpacing="0.015"
                 android:singleLine="true"
@@ -150,8 +106,8 @@
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:gravity="center_vertical"
+                android:layout_marginTop="5dp"
+                android:gravity="top"
                 android:orientation="horizontal">
                 <TextView
                     android:id="@+id/big_time"
@@ -161,33 +117,26 @@
                     android:fontFamily="@font/outfit"
                     android:includeFontPadding="false"
                     android:singleLine="true"
-                    android:textSize="42sp" />
+                    android:textSize="36sp" />
                 <TextView
                     android:id="@+id/big_ampm"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="bottom"
                     android:layout_marginStart="6dp"
-                    android:layout_marginBottom="5dp"
                     android:fontFamily="@font/outfit"
                     android:singleLine="true"
                     android:textAllCaps="false"
-                    android:textSize="15sp" />
-                <View
-                    android:id="@+id/big_rule"
-                    android:layout_width="1dp"
-                    android:layout_height="28dp"
-                    android:layout_marginStart="16dp"
-                    android:layout_marginEnd="16dp" />
+                    android:textSize="12sp" />
                 <TextView
                     android:id="@+id/big_date"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="18dp"
                     android:fontFamily="@font/outfit"
                     android:letterSpacing="0.015"
                     android:singleLine="true"
                     android:textAllCaps="false"
-                    android:textSize="14sp" />
+                    android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
 
@@ -196,11 +145,41 @@
             android:id="@+id/picks"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="142dp"
+            android:layout_marginTop="159dp"
             android:clipChildren="false"
             android:clipToPadding="false" />
 
-        <!-- Dock: one band, 5 to 10 apps (Talkies settings → Dock size), then the All apps button -->
+        <LinearLayout
+            android:id="@+id/pick_caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="42dp"
+            android:layout_marginTop="353dp"
+            android:layout_marginEnd="40dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+            <TextView
+                android:id="@+id/pick_caption_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="@font/outfit"
+                android:includeFontPadding="false"
+                android:maxLines="2"
+                android:textSize="16sp" />
+            <TextView
+                android:id="@+id/pick_caption_meta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:fontFamily="@font/outfit"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:textSize="12.5sp" />
+        </LinearLayout>
+
+        <!-- Dock: one band, 5 to 10 apps (Sweep TV settings → Dock size), then the All apps button -->
         <FrameLayout
             android:id="@+id/dock_band"
             android:layout_width="match_parent"
@@ -269,6 +248,20 @@
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
         android:textSize="13sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/drawer_hint"
+        android:layout_width="wrap_content"
+        android:layout_height="28dp"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="76dp"
+        android:fontFamily="@font/outfit"
+        android:gravity="center"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:text="@string/drawer_home_hint"
+        android:textSize="12sp"
         android:visibility="gone" />
 
     <!-- Inputs, Control Center and Channels menus; scrolls when long -->

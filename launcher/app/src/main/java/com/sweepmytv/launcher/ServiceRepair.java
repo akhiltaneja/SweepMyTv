@@ -19,10 +19,10 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Android takes Talkies' accessibility service off the enabled list when the app is force-stopped (it counts as
+ * Android takes Sweep TV' accessibility service off the enabled list when the app is force-stopped (it counts as
  * a crash), and then Home goes to Google TV until you switch it on again. While the service runs it records itself
  * here, and drops the record when Android unbinds it (you turned it off); a force stop kills the process before
- * that, so the record stays. When Talkies starts again (you open it, the TV boots, or it's updated) a recorded
+ * that, so the record stays. When Sweep TV starts again (you open it, the TV boots, or it's updated) a recorded
  * service is put back on the list. That needs WRITE_SECURE_SETTINGS, which only you can grant, once, over adb:
  * {@code adb shell pm grant com.sweepmytv.launcher android.permission.WRITE_SECURE_SETTINGS}. Without it nothing happens.
  */
@@ -32,7 +32,7 @@ final class ServiceRepair {
 
     private ServiceRepair() { }
 
-    /** Boot and app updates: put the service back without waiting for Talkies to be opened. */
+    /** Boot and app updates: put the service back without waiting for Sweep TV to be opened. */
     public static class Starter extends BroadcastReceiver {
         @Override public void onReceive(Context c, Intent i) { restore(c); }
     }

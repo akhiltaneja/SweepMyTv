@@ -1,0 +1,9 @@
+{
+  "name": "sweep-tv-catalog",
+  "compatibility_date": "2026-11-17",
+  "assets": {
+    "directory": "./public",
+    "html_handling": "none",
+    "not_found_handling": "none"
+  }
+}

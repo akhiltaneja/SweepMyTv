@@ -2,29 +2,109 @@ package com.sweepmytv.launcher;
 
 import android.app.ActivityManager;
 import android.content.Context;
-import android.graphics.*;
-import android.os.*;
+import android.content.SharedPreferences;
+import android.graphics.Canvas;
+import android.os.Environment;
+import android.os.StatFs;
+import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.view.View;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
-/** A compact, optional status pill. Every metric can be switched off independently. */
+/** Optional free capacity and uptime, displayed beside the rotating header card. */
 public class Meters extends View {
-    private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final float dp;private int text=0xFFEDF2FA;private String line="";
-    public Meters(Context c,AttributeSet a){super(c,a);dp=getResources().getDisplayMetrics().density;paint.setTypeface(getResources().getFont(R.font.outfit));paint.setTextSize(9*getResources().getDisplayMetrics().scaledDensity);}
-    void setColor(int text){this.text=text;invalidate();}
-    void update(){
-        List<String> bits=new ArrayList<>();Context c=getContext();
-        if(HomeOptions.stat(c,"ram")){ActivityManager.MemoryInfo info=new ActivityManager.MemoryInfo();ActivityManager manager=c.getSystemService(ActivityManager.class);if(manager!=null){manager.getMemoryInfo(info);bits.add("RAM "+gb(info.availMem));}}
-        if(HomeOptions.stat(c,"storage"))try{bits.add("Disk "+gb(new StatFs(Environment.getDataDirectory().getPath()).getAvailableBytes()));}catch(RuntimeException ignored){}
-        if(HomeOptions.stat(c,"uptime")){long minutes=SystemClock.elapsedRealtime()/60_000;bits.add("Up "+minutes/60+"h "+minutes%60+"m");}
-        if(HomeOptions.stat(c,"codex")){CodexUsage usage=CodexUsage.read(c);bits.add("Codex "+(usage==null?"not connected":usage.compact(System.currentTimeMillis())));}
-        line=String.join("  ·  ",bits);setContentDescription(line+". RAM and disk values are free space.");
-        setVisibility(HomeOptions.prefs(c).getBoolean("meters",true)&&!bits.isEmpty()?VISIBLE:GONE);requestLayout();invalidate();
+    private static final int MIN_COLUMN_WIDTH = 42, COLUMN_GAP = 8;
+    private final HeaderWidgetStyle style;
+    private int primary, secondary;
+    private final List<String> labels = new ArrayList<>();
+    private final List<String> values = new ArrayList<>();
+    private final float dp;
+    private String summary = "";
+
+    public Meters(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        style = new HeaderWidgetStyle(context);
+        dp = style.dp;
     }
-    String content(){return line;}
-    private static String gb(long bytes){return bytes<1e9?Math.round(bytes/1e6)+" MB":String.format(Locale.getDefault(),"%.1f GB",bytes/1e9);}
-    @Override protected void onMeasure(int w,int h){setMeasuredDimension(resolveSize((int)(paint.measureText(line)+16*dp),w),resolveSize((int)(18*dp),h));}
-    @Override protected void onDraw(Canvas canvas){paint.setColor((text&0xFFFFFF)|0x10000000);canvas.drawRoundRect(0,0,getWidth(),getHeight(),9*dp,9*dp,paint);paint.setColor((text&0xFFFFFF)|0xD9000000);String visible=line;while(paint.measureText(visible)>getWidth()-16*dp&&visible.length()>1)visible=visible.substring(0,visible.length()-2)+"…";canvas.drawText(visible,8*dp,(getHeight()-paint.ascent()-paint.descent())/2,paint);}
+
+    void setColors(int primary, int secondary) {
+        this.primary = primary;
+        this.secondary = secondary;
+        invalidate();
+    }
+
+    void update() {
+        Context context = getContext();
+        SharedPreferences prefs = HomeOptions.prefs(context);
+        labels.clear();
+        values.clear();
+        if (HomeOptions.Metric.RAM.shown(prefs)) {
+            ActivityManager manager = context.getSystemService(ActivityManager.class);
+            if (manager != null) {
+                ActivityManager.MemoryInfo info = new ActivityManager.MemoryInfo();
+                manager.getMemoryInfo(info);
+                add("RAM", capacity(info.availMem));
+            }
+        }
+        if (HomeOptions.Metric.STORAGE.shown(prefs)) {
+            try {
+                long bytes = new StatFs(Environment.getDataDirectory().getPath()).getAvailableBytes();
+                add("Storage", String.format(Locale.getDefault(), bytes < 1e9 ? "%.2f GB" : "%.1f GB", bytes / 1e9));
+            } catch (RuntimeException ignored) { }
+        }
+        if (HomeOptions.Metric.UPTIME.shown(prefs)) {
+            long minutes = SystemClock.elapsedRealtime() / 60_000;
+            add("Uptime", minutes / 60 + "h " + minutes % 60 + "m");
+        }
+        List<String> descriptions = new ArrayList<>();
+        for (int i = 0; i < labels.size(); i++) {
+            String label = labels.get(i);
+            descriptions.add(label + " " + values.get(i) + ("Uptime".equals(label) ? "" : " free"));
+        }
+        summary = String.join(", ", descriptions);
+        setContentDescription(summary);
+        invalidate();
+    }
+
+    private void add(String label, String value) {
+        labels.add(label);
+        values.add(value);
+    }
+
+    String content() { return summary; }
+
+    private static String capacity(long bytes) {
+        return bytes < 1e9 ? Math.round(bytes / 1e6) + " MB" : String.format(Locale.getDefault(), "%.1f GB", bytes / 1e9);
+    }
+
+    @Override protected void onMeasure(int width, int height) {
+        float desiredWidth = 2 * HeaderWidgetStyle.PADDING;
+        for (int i = 0; i < values.size(); i++) desiredWidth += columnWidth(i);
+        desiredWidth += Math.max(0, values.size() - 1) * COLUMN_GAP;
+        setMeasuredDimension(resolveSize(Math.round(desiredWidth * dp), width),
+                resolveSize(Math.round(36 * dp), height));
+    }
+
+    private String columnLabel(int i) {
+        String label = labels.get(i);
+        return "Uptime".equals(label) ? label : label + " free";
+    }
+
+    private float columnWidth(int i) {
+        float label = style.paint(HeaderWidgetStyle.LABEL_SIZE, secondary, false).measureText(columnLabel(i));
+        float value = style.paint(HeaderWidgetStyle.VALUE_SIZE, primary, true).measureText(values.get(i));
+        return Math.max(MIN_COLUMN_WIDTH, (float) Math.ceil(Math.max(label, value) / dp));
+    }
+
+    @Override protected void onDraw(Canvas canvas) {
+        float x = HeaderWidgetStyle.PADDING;
+        for (int i = 0; i < labels.size(); i++) {
+            float column = columnWidth(i);
+            float max = Math.min(column, getWidth() / dp - x - HeaderWidgetStyle.PADDING);
+            style.pair(canvas, columnLabel(i), values.get(i), x, max, primary, secondary);
+            x += column + COLUMN_GAP;
+        }
+    }
 }
