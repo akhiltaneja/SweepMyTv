@@ -19,7 +19,12 @@ function notFound(req, res) {
 const server = http.createServer(async (req, res) => {
   try {
     if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405); return res.end(); }
-    const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+    const url = new URL(req.url, 'http://localhost');
+    const pathname = decodeURIComponent(url.pathname);
+    if (pathname === '/tutorials/android-phone' || pathname === '/tutorials/android-phone/') {
+      res.writeHead(308, { Location: '/tutorials/phone/' + url.search });
+      return res.end();
+    }
     const file = path.resolve(root, '.' + (pathname.endsWith('/') ? pathname + 'index.html' : pathname));
     if (!file.startsWith(root)) { res.writeHead(403); return res.end('Forbidden'); }
     const info = await stat(file);
