@@ -72,7 +72,9 @@ Wait for `Success` and open Sweep TV from Apps. The `-r` flag preserves data whe
 
 Follow the [first-time setup guide](https://sweepmytv.com/tutorials/first-time-setup/) after installing.
 
-- **Open Sweep TV** from Apps. If your TV offers a **Home app** picker, use it to select Sweep TV. If the physical Home button still goes to stock Home, review **System → Finish setup → Home button helper** and enable the optional helper only if needed.
+Open **Apps → Sweep TV** to reach its home screen. Select the settings icon at the top right, then go to **Sweep TV settings → System → Finish setup**.
+
+- **Choose what Home opens.** If your TV offers a **Home app** picker, use it to select Sweep TV. If the physical Home button still goes to stock Home, review **Home button helper** in Finish setup and enable it if needed.
 - **Set up Continue Watching** by reviewing **Notification access** and **Read TV listings** in Finish setup if they are available on your TV. What appears depends on the apps that share playback information.
 - **Choose your sports.** In **System → Finish setup**, enable Formula 1, Cricket, or both under **Sports to follow**. Both start off when you have no saved choice.
 - **Make it yours.** Choose your dock apps and theme in Sweep TV settings. You can install and use the launcher without a catalog key. The available discovery options depend on your build.
