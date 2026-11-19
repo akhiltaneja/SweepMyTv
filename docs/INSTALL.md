@@ -1,6 +1,6 @@
 # Install SweepMyTV
 
-[Claude Code or Codex](#install-with-claude-code-or-codex) · [Android phone](#install-from-an-android-phone) · [Laptop](#install-from-a-laptop) · [First launch](#first-launch)
+[Claude Code or Codex](#install-with-claude-code-or-codex) · [Android or iPhone](#install-from-your-phone) · [Laptop](#install-from-a-laptop) · [First launch](#first-launch)
 
 SweepMyTV requires an **Android TV or Google TV device running Android 8.0 or newer** that allows APK installation. Check **Settings → About** on the device receiving the app. An Android TV streaming box connected to a Samsung or LG television can qualify even when the television itself runs a different OS.
 
@@ -25,13 +25,11 @@ SweepMyTV requires an **Android TV or Google TV device running Android 8.0 or ne
 
 **Using ChatGPT or Gemini in a browser?** Paste the same prompt and add “Give me one step at a time and wait for my result.” Run the commands it gives you in your computer’s terminal.
 
-## Install from an Android phone
+<a name="install-from-an-android-phone"></a>
 
-1. Download `sweep-tv.apk` from the Assets section of the [signed preview release](https://github.com/akhiltaneja/SweepMyTv/releases/tag/v1.3.0-sweep.151). Install [Send Files to TV](https://play.google.com/store/apps/details?id=com.yablio.sendfilestotv) on your phone and TV.
-2. Connect both devices to the same Wi-Fi. Open Send Files to TV on the TV and choose **Receive**. On the phone, choose **Send**, select the APK, and pick your TV.
-3. Open the received APK with the TV’s file manager or directly from the transfer app if it offers that option. If Android asks, allow installation from the app opening the file. Choose **Install**, then open Sweep TV from the TV’s Apps screen.
+## Install from your phone
 
-If your TV supports USB drives, you can put the APK on a drive and open it with the TV’s file manager. Use that route or the laptop method if you have an iPhone.
+Follow the [phone install guide](https://sweepmytv.com/tutorials/android-phone/) for Android and iPhone. Download the signed installer, open [LocalSend](https://localsend.org/download) on both your phone and TV, and send the file over the same Wi-Fi. Open the received file on your TV to install SweepMyTV, then follow the [first-launch steps](#first-launch).
 
 ## Install from a laptop
 
