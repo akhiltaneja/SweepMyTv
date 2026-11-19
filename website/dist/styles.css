@@ -540,6 +540,7 @@ dialog::backdrop{background:#000d}
 .tutorial-section p{margin:10px 0}
 .tutorial-section p:not(.settings-path){max-width:76ch}
 .tutorial-shot{max-width:720px;margin-block:14px 20px}
+.tutorial-shot-portrait{max-width:280px}
 .tutorial-shot>a{display:block;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .tutorial-shot>a:hover{border-color:var(--line-strong)}
 .tutorial-shot img{width:100%;height:auto}
