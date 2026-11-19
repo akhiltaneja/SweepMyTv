@@ -29,7 +29,7 @@ SweepMyTV requires an **Android TV or Google TV device running Android 8.0 or ne
 
 ## Install from your phone
 
-Follow the [phone install guide](https://sweepmytv.com/tutorials/phone/) for Android and iPhone. Download the signed installer, open [LocalSend](https://localsend.org/download) on both your phone and TV, and send the file over the same Wi-Fi. On the TV, open the received APK from Downloads using a file manager. If Android prompts you, enable **Allow from this source** for the file manager. Install SweepMyTV, then follow the [first-launch steps](#first-launch).
+Follow the [phone install guide](https://sweepmytv.com/tutorials/phone/) for Android and iPhone. Download the signed installer, open [LocalSend](https://localsend.org/download) on both your phone and TV, and send the file over the same Wi-Fi. On the TV, open **Install unknown apps** in Settings and enable **Allow from this source** for your file manager. Then use the file manager to open the APK from Downloads and install SweepMyTV. Follow the [first-launch steps](#first-launch).
 
 ## Install from a laptop
 
