@@ -56,6 +56,8 @@
 
 <section class="tutorial-section" id="connect">
   <h2>Connect</h2>
+<p>Run <code>adb devices -l</code> first. If your TV is listed as <code>device</code>, skip to installation. Otherwise open <strong>Pair device with pairing code</strong> on the TV if available and run <code>adb mdns services</code> on your laptop. Match the entry to your TV. Use its <code>_adb-tls-pairing._tcp</code> address with <code>adb pair</code> and enter the code in the terminal.</p>
+<p>After pairing, check <code>adb devices -l</code> again. If needed, use the TV’s <code>_adb-tls-connect._tcp</code> address with <code>adb connect</code>. For a TV advertising <code>_adb._tcp</code>, connect directly and approve the prompt on the TV. If discovery is unavailable, use the addresses shown on your TV as described below.</p>
 <p><strong>If the TV shows a pairing code</strong>, use the address shown in that dialog for <code>adb pair</code>. Then use the main Wireless debugging screen’s address for <code>adb connect</code>. It may use a different port.</p><pre><code>adb pair 192.168.1.100:37123
 adb connect 192.168.1.100:42189</code></pre><p><strong>If the TV offers network debugging without pairing</strong>, connect to its listed address and approve the debugging prompt on the TV.</p><pre><code>adb connect 192.168.1.100:5555</code></pre><p>The addresses above are examples. Replace them with the TV’s values. If the TV or box officially supports USB debugging through a data port, you can connect by USB and use its serial from <code>adb devices -l</code>. <a href="https://developer.android.com/tools/adb#connect-to-a-device-over-wi-fi">Android debugging instructions</a></p>
 </section>

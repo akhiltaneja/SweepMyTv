@@ -1,5 +1,1 @@
-Install SweepMyTV on my Android TV using ADB. Get `sweep-tv.apk` and `SHA256SUMS` from the newest published preview at https://github.com/akhiltaneja/SweepMyTv/releases.
-
-Ask for my TV’s debugging address and let me enter any pairing code. Verify the APK’s SHA-256, then run `adb -s <TV> install -r <APK>`. Ask before making any other changes.
-
-After installation, open Sweep TV and point me to https://sweepmytv.com/tutorials/first-time-setup/.
+Use ADB to install the newest SweepMyTV preview from https://github.com/akhiltaneja/SweepMyTv/releases on my TV. Find my TV on this Wi-Fi first with `adb devices -l` and `adb mdns services`. Help me pair if needed and let me enter the code in my terminal. Confirm which TV is mine if unclear. Ask for its local address only if discovery fails. Verify the published checksum and keep my app data. Open Sweep TV and show me https://sweepmytv.com/tutorials/first-time-setup/. Ask before changing anything else.

@@ -12,7 +12,7 @@ SweepMyTV requires an **Android TV or Google TV device running Android 8.0 or ne
 
 1. Put your computer and TV on the same Wi-Fi. [Enable wireless or network debugging on the TV](https://sweepmytv.com/tutorials/wireless-debugging/).
 2. Open Claude Code or Codex on your computer. In the ChatGPT desktop app, select **Codex** and start a local session. You can also use one of the other local tools below.
-3. Paste the [SweepMyTV setup prompt](../prompt.md). Share the debugging address shown on your TV, approve the connection if asked, and enter any pairing code directly in your terminal. Once Sweep TV opens, follow the [first-launch steps](#first-launch).
+3. Paste the [SweepMyTV setup prompt](../prompt.md). The assistant looks for the TV on your Wi-Fi first. If prompted, choose your TV and enter its pairing code in your terminal. You only need to enter the TV’s local address if discovery fails. Once Sweep TV opens, follow the [first-launch steps](#first-launch).
 
 ### Which AI assistants can I use?
 
@@ -41,7 +41,11 @@ If the TV shows **App blocked to protect your device**, leave Play Protect enabl
 
 ### Connect to the TV
 
-Use the address and port shown on your TV. The values below are examples.
+Check for an existing connection with `adb devices -l`. If your TV is listed as `device`, use its listed identifier and skip to installation. If several devices appear, match the model or identifier to your TV.
+
+For a new connection, open **Pair device with pairing code** on the TV if available. Run `adb mdns services` on the laptop. Use the endpoint marked `_adb-tls-pairing._tcp` for your TV with `adb pair` and enter the code in your terminal. After pairing, check `adb devices -l` again. If it hasn’t connected automatically, use your TV’s `_adb-tls-connect._tcp` endpoint with `adb connect`. A TV advertising legacy `_adb._tcp` uses `adb connect` and may ask for approval on the TV.
+
+If nothing appears or you can’t identify your TV, use the address and port shown on the TV. The values below are examples.
 
 **If the TV shows a pairing code**, select **Pair device with pairing code** and use the address from that dialog. When pairing finishes, use the connection address from the main Wireless debugging screen, which may have a different port.
 
